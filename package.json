@@ -1,0 +1,20 @@
+{
+  "name": "stockwatch-monorepo",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "frontend"
+  ],
+  "scripts": {
+    "build": "npm run build -w @stockwatch/shared && npm run build -w @stockwatch/server",
+    "test": "npm run test -w @stockwatch/server",
+    "dev": "npm run dev -w @stockwatch/server",
+    "cli": "npm run cli -w @stockwatch/server"
+  },
+  "dependencies": {
+    "jsonwebtoken": "^9.0.3"
+  },
+  "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.10"
+  }
+}

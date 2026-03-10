@@ -1,0 +1,55 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pgvector(map: "vector")]
+}
+
+model WatchlistItem {
+  id      Int      @id @default(autoincrement())
+  userId  String
+  symbol  String
+  addedAt DateTime @default(now())
+
+  @@unique([userId, symbol])
+  @@index([userId])
+}
+
+model AnalysisSnapshot {
+  id            Int      @id @default(autoincrement())
+  userId        String
+  symbol        String
+  createdAt     DateTime @default(now())
+  sentiment     String
+  reportText    String
+  modelUsed     String
+  price         Float?
+  peRatio       Float?
+  marketCap     Float?
+  beta          Float?
+  week52High    Float?
+  week52Low     Float?
+  dividendYield Float?
+  companyName   String?
+  embeddings    AnalysisEmbedding[]
+
+  @@index([userId, symbol, createdAt(sort: Desc)])
+}
+
+model AnalysisEmbedding {
+  id         Int              @id @default(autoincrement())
+  userId     String
+  snapshotId Int
+  snapshot   AnalysisSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  symbol     String
+  section    String?          // "summary" | "bull_case" | "bear_case" | "risks" | "catalysts" | "valuation" | "conclusion" | null (legacy)
+  text       String
+  embedding  Unsupported("vector(768)")
+
+  @@index([userId, symbol])
+  @@index([userId, symbol, section])
+}
