@@ -28,21 +28,16 @@ interface StockTableProps {
 export default function StockTable({ rows, onAnalyze, onRemove, analyzing }: StockTableProps) {
   const [sortKey, setSortKey] = useState<SortKey | null>(null)
   const [sortDir, setSortDir] = useState<SortDir>('asc')
-  const [sortClicks, setSortClicks] = useState(0)
-
   function handleSort(key: SortKey) {
     if (sortKey === key) {
       if (sortDir === 'asc') {
         setSortDir('desc')
-        setSortClicks(2)
       } else if (sortDir === 'desc') {
         setSortKey(null)
-        setSortClicks(0)
       }
     } else {
       setSortKey(key)
       setSortDir('asc')
-      setSortClicks(1)
     }
   }
 
