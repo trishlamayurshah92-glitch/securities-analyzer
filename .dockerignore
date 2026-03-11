@@ -1,0 +1,13 @@
+.git
+.github
+node_modules
+packages/shared/node_modules
+packages/shared/dist
+packages/server/node_modules
+packages/server/dist
+frontend/node_modules
+frontend/dist
+*.log
+.env
+.env.*
+!.env.example
