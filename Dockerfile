@@ -34,6 +34,11 @@ COPY packages/server/package.json packages/server/
 # symlink target is a valid package at both install-time and runtime.
 RUN npm ci --omit=dev
 
+# Copy the generated Prisma client from the build stage (prisma generate ran there).
+# Without this, PrismaClient throws at import time because the generated files are
+# not recreated by npm ci --omit=dev (prisma CLI is a devDependency).
+COPY --from=build /app/node_modules/.prisma node_modules/.prisma/
+
 COPY --from=build /app/packages/shared/package.json packages/shared/package.json
 COPY --from=build /app/packages/shared/dist packages/shared/dist/
 COPY --from=build /app/packages/server/dist packages/server/dist/
