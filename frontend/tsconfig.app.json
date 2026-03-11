@@ -22,7 +22,10 @@
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true
+    "noUncheckedSideEffectImports": true,
+    "paths": {
+      "@stockwatch/shared": ["../../packages/shared/dist/index.d.ts"]
+    }
   },
   "include": ["src"]
 }
