@@ -74,10 +74,7 @@ if (existsSync(frontendDist)) {
 
 export { app };
 
-const isMain = process.argv[1] === fileURLToPath(import.meta.url);
-if (isMain) {
-  const PORT = process.env.PORT ?? 8001;
-  app.listen(PORT, () => {
-    console.log(`Stockwatch API running on http://localhost:${PORT}`);
-  });
-}
+const PORT = parseInt(process.env.PORT ?? '8001', 10);
+app.listen(PORT, () => {
+  console.log(`Stockwatch API running on http://localhost:${PORT}`);
+});
