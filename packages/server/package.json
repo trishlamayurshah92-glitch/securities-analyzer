@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "build": "prisma generate && tsc",
+    "build": "prisma generate && tsc -b",
     "start": "node --env-file=../../.env dist/web/app.js",
     "dev": "tsc -b && node --env-file=../../.env dist/web/app.js",
     "cli": "tsc -b && node --env-file=../../.env dist/cli/main.js",
