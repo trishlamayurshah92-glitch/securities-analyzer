@@ -63,8 +63,6 @@ jobs:
               ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,\
               GEMINI_API_KEY=GEMINI_API_KEY:latest,\
               FINNHUB_API_KEY=FINNHUB_API_KEY:latest,\
-              PINECONE_API_KEY=PINECONE_API_KEY:latest,\
-              JWT_SECRET=JWT_SECRET:latest,\
               SUPABASE_URL=SUPABASE_URL:latest,\
               SUPABASE_SECRET_KEY=SUPABASE_SECRET_KEY:latest,\
               DATABASE_URL=DATABASE_URL:latest"
