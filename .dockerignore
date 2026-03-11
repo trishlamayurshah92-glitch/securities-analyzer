@@ -7,6 +7,8 @@ packages/server/node_modules
 packages/server/dist
 frontend/node_modules
 frontend/dist
+packages/shared/tsconfig.tsbuildinfo
+packages/server/tsconfig.tsbuildinfo
 *.log
 .env
 .env.*

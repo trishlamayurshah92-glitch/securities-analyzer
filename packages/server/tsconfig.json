@@ -4,7 +4,7 @@
     "outDir": "dist",
     "rootDir": "src",
     "paths": {
-      "@stockwatch/shared": ["../shared/src/index.ts"]
+      "@stockwatch/shared": ["../shared/dist/index.d.ts"]
     }
   },
   "include": ["src"],
