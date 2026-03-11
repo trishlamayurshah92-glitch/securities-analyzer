@@ -4,6 +4,13 @@ import { existsSync } from 'fs';
 import { randomUUID } from 'crypto';
 import 'dotenv/config';
 import express from 'express';
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[startup] Unhandled rejection (process kept alive):', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[startup] Uncaught exception:', err);
+});
 import cors from 'cors';
 import { watchlistRouter } from './routes/watchlist.js';
 import { analyzeRouter } from './routes/analyze.js';
@@ -31,6 +38,8 @@ app.use((req, _res, next) => {
   next();
 });
 
+app.get('/health', (_req, res) => res.json({ status: 'ok' }));
+
 app.use('/api', requireAuth);
 app.use('/api/watchlist', watchlistRouter);
 app.use('/api/analyze', analyzeRouter);
@@ -52,7 +61,7 @@ app.use((req, res, next) => {
 });
 
 // Warm up MCP servers at boot (non-blocking)
-getMCPManager().catch((e) => console.error('MCP init failed:', e));
+getMCPManager().catch((e) => console.error('[mcp-warmup] init failed (non-fatal):', e));
 
 // Serve frontend static files in production
 const frontendDist = resolve(__dirname, '..', '..', '..', '..', 'frontend', 'dist');

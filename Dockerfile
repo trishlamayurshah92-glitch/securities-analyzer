@@ -46,4 +46,4 @@ COPY --from=build /app/frontend/dist frontend/dist/
 COPY watchlist.json ./
 
 EXPOSE 8001
-ENTRYPOINT ["node", "packages/server/dist/web/app.js"]
+ENTRYPOINT ["node", "/app/packages/server/dist/web/app.js"]

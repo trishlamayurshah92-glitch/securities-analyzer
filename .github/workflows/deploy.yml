@@ -65,7 +65,15 @@ jobs:
               FINNHUB_API_KEY=FINNHUB_API_KEY:latest,\
               SUPABASE_URL=SUPABASE_URL:latest,\
               SUPABASE_SECRET_KEY=SUPABASE_SECRET_KEY:latest,\
-              DATABASE_URL=DATABASE_URL:latest"
+              DATABASE_URL=DATABASE_URL:latest" \
+            --startup-cpu-boost
+
+      - name: Show Cloud Run logs on failure
+        if: failure()
+        run: |
+          gcloud run services logs read ${{ env.SERVICE_NAME }} \
+            --region=${{ env.GCP_REGION }} \
+            --limit=100
 
       - name: Show deployed URL
         run: |
