@@ -61,7 +61,6 @@ jobs:
             --service-account=securities-analyzer-runtime@${{ env.GCP_PROJECT_ID }}.iam.gserviceaccount.com \
             --set-env-vars="NODE_ENV=production,MODEL=${{ secrets.MODEL }},GCP_PROJECT=${{ secrets.GCP_PROJECT_ID }},GCP_REGION=us-central1" \
             --set-secrets="\
-              ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,\
               GEMINI_API_KEY=GEMINI_API_KEY:latest,\
               FINNHUB_API_KEY=FINNHUB_API_KEY:latest,\
               SUPABASE_URL=SUPABASE_URL:latest,\

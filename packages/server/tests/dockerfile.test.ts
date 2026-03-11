@@ -51,7 +51,6 @@ describe('Project structure', () => {
 
   it('.env.example contains required keys', () => {
     const content = readFileSync(resolve(PROJECT_ROOT, '.env.example'), 'utf-8');
-    expect(content).toContain('ANTHROPIC_API_KEY');
     expect(content).toContain('GEMINI_API_KEY');
     expect(content).toContain('FINNHUB_API_KEY');
     expect(content).toContain('DATABASE_URL');
