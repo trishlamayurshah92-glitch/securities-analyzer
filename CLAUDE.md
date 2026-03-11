@@ -91,4 +91,4 @@ Uses Vitest. Run with `npm test` from root or `npx vitest run` from `packages/se
 - `packages/server/src/agent/prompts.ts` — system prompt defining the LLM's analysis workflow and report format
 - `packages/server/src/agent/orchestrator.ts` — dual-provider agentic loop
 - `packages/server/src/lib/pinecone.ts` — shared Pinecone helpers (used by MCP history server and Express routes)
-- `.env` — API keys: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY` (or `GOOGLE_API_KEY`), `FINNHUB_API_KEY`, `PINECONE_API_KEY`, `MODEL`, `PORT` (optional, default 8001)
+- `.env` — API keys: `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `FINNHUB_API_KEY`, `PINECONE_API_KEY`, `MODEL`, `PORT` (optional, default 8001)

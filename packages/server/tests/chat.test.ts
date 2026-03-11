@@ -94,8 +94,6 @@ beforeEach(() => {
   vi.clearAllMocks();
   delete process.env.MODEL;
   delete process.env.GEMINI_API_KEY;
-  delete process.env.GOOGLE_API_KEY;
-  delete process.env.OPENAI_API_KEY;
 
   // Default: MCP manager resolves immediately with no tools
   mockGetMCPManager.mockResolvedValue(defaultMCPManager());

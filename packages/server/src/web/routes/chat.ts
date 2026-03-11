@@ -33,8 +33,8 @@ function createAnthropicClient(): Anthropic {
 
 function createOpenAIClient(model: string): OpenAI {
   if (model.startsWith('gemini-')) {
-    const apiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY ?? process.env.OPENAI_API_KEY;
-    if (!apiKey) throw new Error('GEMINI_API_KEY (or GOOGLE_API_KEY) is required for Gemini models.');
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) throw new Error('GEMINI_API_KEY is required for Gemini models.');
     return new OpenAI({
       apiKey,
       baseURL: process.env.OPENAI_BASE_URL ?? 'https://generativelanguage.googleapis.com/v1beta/openai/',

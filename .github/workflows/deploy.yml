@@ -61,7 +61,6 @@ jobs:
             --set-env-vars="NODE_ENV=production,PORT=8001,MODEL=${{ secrets.MODEL }},GCP_PROJECT=${{ secrets.GCP_PROJECT_ID }},GCP_REGION=us-central1" \
             --set-secrets="\
               ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,\
-              OPENAI_API_KEY=OPENAI_API_KEY:latest,\
               GEMINI_API_KEY=GEMINI_API_KEY:latest,\
               FINNHUB_API_KEY=FINNHUB_API_KEY:latest,\
               PINECONE_API_KEY=PINECONE_API_KEY:latest,\

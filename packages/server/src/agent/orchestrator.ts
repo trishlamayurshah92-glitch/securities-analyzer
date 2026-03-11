@@ -28,9 +28,9 @@ async function createClient(model: string): Promise<Anthropic | OpenAI> {
   if (isOpenAIModel(model)) {
     // Auto-configure for Gemini models
     if (model.startsWith('gemini-')) {
-      const apiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY ?? process.env.OPENAI_API_KEY;
+      const apiKey = process.env.GEMINI_API_KEY;
       if (!apiKey) {
-        throw new ConfigError('GEMINI_API_KEY (or GOOGLE_API_KEY) environment variable is required for Gemini models.');
+        throw new ConfigError('GEMINI_API_KEY environment variable is required for Gemini models.');
       }
       return new OpenAI({
         apiKey,

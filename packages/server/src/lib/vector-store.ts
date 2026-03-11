@@ -2,14 +2,10 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { prisma } from './db.js';
 import type { TrendPoint } from '@stockwatch/shared';
 
-const googleApiKey =
-  process.env.GEMINI_API_KEY ??
-  process.env.GOOGLE_API_KEY ??
-  process.env.OPENAI_API_KEY ??
-  '';
+const googleApiKey = process.env.GEMINI_API_KEY ?? '';
 
 if (!googleApiKey) {
-  console.warn('[vector-store] WARNING: No Google API key found (GEMINI_API_KEY / GOOGLE_API_KEY) — embeddings will fail');
+  console.warn('[vector-store] WARNING: GEMINI_API_KEY is not set — embeddings will fail');
 }
 
 const genAI = new GoogleGenerativeAI(googleApiKey);
