@@ -13,8 +13,7 @@ COPY tsconfig.base.json ./
 COPY packages/ packages/
 COPY frontend/ frontend/
 
-RUN npm run build -w @stockwatch/shared
-RUN npm run build -w @stockwatch/server
+RUN npm run build
 RUN cd frontend && npm run build
 
 # Stage 2: Production
