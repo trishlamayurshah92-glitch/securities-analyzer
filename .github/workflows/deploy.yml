@@ -67,6 +67,7 @@ jobs:
               FINNHUB_API_KEY=FINNHUB_API_KEY:latest,\
               SUPABASE_URL=SUPABASE_URL:latest,\
               SUPABASE_SECRET_KEY=SUPABASE_SECRET_KEY:latest,\
+              SUPABASE_PUBLISHABLE_KEY=SUPABASE_PUBLISHABLE_KEY:latest,\
               DATABASE_URL=DATABASE_URL:latest" \
 
       - name: Show Cloud Run logs on failure
