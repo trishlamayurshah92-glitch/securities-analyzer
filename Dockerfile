@@ -2,6 +2,12 @@
 FROM node:20-alpine AS build
 WORKDIR /app
 
+# Accept VITE vars as build args so Vite bakes them into the frontend bundle
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_PUBLISHABLE_KEY
+ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
+ENV VITE_SUPABASE_PUBLISHABLE_KEY=$VITE_SUPABASE_PUBLISHABLE_KEY
+
 # Copy manifests first so npm ci is cached independently of source changes
 COPY package.json package-lock.json* ./
 COPY packages/shared/package.json packages/shared/
