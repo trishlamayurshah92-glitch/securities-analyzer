@@ -18,10 +18,10 @@ export default function ToolCallIndicator({ tools }: Props) {
 
   return (
     <div className="flex justify-start">
-      <div className="flex flex-col gap-1 rounded-2xl rounded-tl-sm bg-gray-800/60 px-4 py-2.5">
+      <div className="flex flex-col gap-1 rounded-2xl rounded-tl-sm bg-[#F0F2F5] px-4 py-2.5">
         {tools.map((name) => (
-          <span key={name} className="flex items-center gap-2 text-xs text-gray-400">
-            <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-emerald-400 border-t-transparent" />
+          <span key={name} className="flex items-center gap-2 text-xs text-[#5E6C84]">
+            <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-[#0052CC] border-t-transparent" />
             {TOOL_LABELS[name] ?? name}
             <span className="animate-pulse">...</span>
           </span>

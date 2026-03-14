@@ -31,9 +31,9 @@ export default function AnalysisPage() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Run Analysis</h1>
 
-      <div className="space-y-4 rounded-xl border border-gray-800 bg-gray-900 p-5">
+      <div className="space-y-4 rounded-xl border border-[#DFE1E6] bg-white p-5">
         <div>
-          <label className="mb-2 block text-sm font-medium text-gray-400">
+          <label className="mb-2 block text-sm font-medium text-[#5E6C84]">
             Select symbols (leave empty to analyze all)
           </label>
           <div className="flex flex-wrap gap-2">
@@ -43,15 +43,15 @@ export default function AnalysisPage() {
                 onClick={() => toggleSymbol(symbol)}
                 className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
                   selected.has(symbol)
-                    ? 'bg-emerald-600 text-white'
-                    : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                    ? 'bg-[#0052CC] text-white'
+                    : 'bg-[#F0F2F5] text-[#344563] hover:bg-[#DFE1E6]'
                 }`}
               >
                 {symbol}
               </button>
             ))}
             {watchlist.length === 0 && (
-              <p className="text-sm text-gray-500">No symbols in watchlist. Add some on the Watchlist page.</p>
+              <p className="text-sm text-[#8993A4]">No symbols in watchlist. Add some on the Watchlist page.</p>
             )}
           </div>
         </div>
@@ -59,14 +59,14 @@ export default function AnalysisPage() {
         <button
           onClick={handleRun}
           disabled={loading}
-          className="rounded-lg bg-emerald-600 px-6 py-2.5 font-medium text-white hover:bg-emerald-500 disabled:opacity-50 transition"
+          className="rounded-lg bg-[#0052CC] px-6 py-2.5 font-medium text-white hover:bg-[#0065FF] disabled:opacity-50 transition"
         >
           Run Analysis
         </button>
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red-800 bg-red-950 px-4 py-3 text-sm text-red-300">
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
         </div>
       )}

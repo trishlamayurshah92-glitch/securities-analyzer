@@ -4,13 +4,13 @@ export default function LoginPage() {
   const { signInWithGoogle } = useAuth()
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="min-h-screen flex items-center justify-center bg-[#F8F9FA]">
       <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-sm text-center">
-        <h1 className="text-2xl font-bold mb-2 text-gray-900">StockWatch</h1>
-        <p className="text-gray-500 mb-8">Sign in to access your watchlist</p>
+        <h1 className="text-2xl font-bold mb-2 text-[#172B4D]">StockWatch</h1>
+        <p className="text-[#5E6C84] mb-8">Sign in to access your watchlist</p>
         <button
           onClick={signInWithGoogle}
-          className="w-full flex items-center justify-center gap-3 px-4 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+          className="w-full flex items-center justify-center gap-3 px-4 py-2 border border-[#DFE1E6] rounded-md shadow-sm bg-white text-[#344563] font-medium hover:bg-gray-50 transition-colors"
         >
           <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
             <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/>

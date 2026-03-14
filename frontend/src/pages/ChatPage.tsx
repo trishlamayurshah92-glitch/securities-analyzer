@@ -45,16 +45,16 @@ export default function ChatPage() {
       <h1 className="mb-4 text-2xl font-bold">Chat with your watchlist</h1>
 
       {/* Message area */}
-      <div className="flex-1 overflow-y-auto rounded-xl border border-gray-800 bg-gray-900 p-4">
+      <div className="flex-1 overflow-y-auto rounded-xl border border-[#DFE1E6] bg-white p-4">
         {showStarters && (
           <div className="flex h-full flex-col items-center justify-center gap-6">
-            <p className="text-sm text-gray-500">Ask anything about your stocks</p>
+            <p className="text-sm text-[#8993A4]">Ask anything about your stocks</p>
             <div className="flex flex-wrap justify-center gap-2">
               {STARTER_PROMPTS.map((prompt) => (
                 <button
                   key={prompt}
                   onClick={() => handleStarterClick(prompt)}
-                  className="rounded-full border border-gray-700 bg-gray-800 px-4 py-2 text-sm text-gray-300 transition hover:border-emerald-500 hover:text-emerald-400"
+                  className="rounded-full border border-[#C1C7D0] bg-[#F0F2F5] px-4 py-2 text-sm text-[#344563] transition hover:border-[#0052CC] hover:text-[#0052CC]"
                 >
                   {prompt}
                 </button>
@@ -76,7 +76,7 @@ export default function ChatPage() {
 
       {/* Error */}
       {error && (
-        <div className="mt-2 rounded-lg border border-red-800 bg-red-950 px-3 py-2 text-sm text-red-300">
+        <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           {error}
         </div>
       )}
@@ -91,7 +91,7 @@ export default function ChatPage() {
           disabled={streaming}
           rows={1}
           placeholder={streaming ? 'Thinking...' : 'Ask about your stocks... (Enter to send)'}
-          className="flex-1 resize-none rounded-xl border border-gray-700 bg-gray-800 px-4 py-3 text-sm text-gray-100 placeholder-gray-500 outline-none transition focus:border-emerald-500 disabled:opacity-50"
+          className="flex-1 resize-none rounded-xl border border-[#C1C7D0] bg-white px-4 py-3 text-sm text-[#172B4D] placeholder-[#8993A4] outline-none transition focus:border-[#0052CC] disabled:opacity-50"
           style={{ maxHeight: '120px', overflowY: 'auto' }}
           onInput={(e) => {
             const el = e.currentTarget;
@@ -102,7 +102,7 @@ export default function ChatPage() {
         <button
           onClick={handleSend}
           disabled={streaming || !input.trim()}
-          className="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50"
+          className="rounded-xl bg-[#0052CC] px-5 py-3 text-sm font-medium text-white transition hover:bg-[#0065FF] disabled:opacity-50"
         >
           Send
         </button>

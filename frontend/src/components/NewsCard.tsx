@@ -8,20 +8,20 @@ export default function NewsCard({ article }: { article: NewsArticle }) {
   })
 
   return (
-    <div className="rounded-xl border border-gray-800 bg-gray-900 p-4 space-y-2">
+    <div className="rounded-xl border border-[#DFE1E6] bg-white p-4 space-y-2">
       <a
         href={article.url}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-sm font-semibold text-gray-100 hover:text-emerald-400 transition"
+        className="text-sm font-semibold text-[#172B4D] hover:text-[#0052CC] transition"
       >
         {article.headline}
       </a>
-      <p className="text-xs text-gray-500">
+      <p className="text-xs text-[#8993A4]">
         {article.source} · {date}
       </p>
       {article.summary && (
-        <p className="text-sm text-gray-400 line-clamp-3">{article.summary}</p>
+        <p className="text-sm text-[#5E6C84] line-clamp-3">{article.summary}</p>
       )}
     </div>
   )
