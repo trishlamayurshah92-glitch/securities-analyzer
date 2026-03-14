@@ -14,6 +14,7 @@ vi.mock('../src/agent/mcp-client.js', () => ({
     connectServer: mockConnectServer,
     getAllToolsForClaude: mockGetAllTools,
     callTool: mockCallTool,
+    callToolWithTimeout: (name: string, args: Record<string, unknown>) => mockCallTool(name, args),
     cleanup: mockCleanup,
   })),
 }));
@@ -182,6 +183,58 @@ describe('StockAnalysisOrchestrator', () => {
       const orchestrator = new StockAnalysisOrchestrator({ model: 'gpt-4o-mini' });
       await orchestrator.cleanup();
       expect(mockCleanup).toHaveBeenCalled();
+    });
+  });
+
+  describe('ToolLoopError', () => {
+    it('throws ToolLoopError after 20 iterations of tool_use', async () => {
+      // Always return tool_use to force infinite loop
+      const mockCreate = vi.fn().mockResolvedValue({
+        stop_reason: 'tool_use',
+        content: [
+          { type: 'tool_use', id: 'tool_x', name: 'get_company_news', input: { symbol: 'AAPL' } },
+        ],
+      } as unknown as import('@anthropic-ai/sdk').Message);
+
+      const mockClient = { messages: { create: mockCreate } } as unknown as import('@anthropic-ai/sdk').default;
+      mockCallTool.mockResolvedValue('[]');
+
+      const orchestrator = new StockAnalysisOrchestrator({
+        client: mockClient,
+        model: 'claude-sonnet-4-20250514',
+      });
+
+      await expect(
+        orchestrator.analyzeWatchlist([{ symbol: 'AAPL' }]),
+      ).rejects.toThrow('Exceeded maximum tool iterations');
+    }, 10000);
+  });
+
+  describe('multiple symbols', () => {
+    it('includes all symbols in user message', async () => {
+      const mockCreate = vi.fn().mockResolvedValue({
+        stop_reason: 'end_turn',
+        content: [{ type: 'text', text: 'Report for all stocks.' }],
+      } as unknown as import('@anthropic-ai/sdk').Message);
+
+      const mockClient = { messages: { create: mockCreate } } as unknown as import('@anthropic-ai/sdk').default;
+
+      const orchestrator = new StockAnalysisOrchestrator({
+        client: mockClient,
+        model: 'claude-sonnet-4-20250514',
+      });
+
+      await orchestrator.analyzeWatchlist([
+        { symbol: 'AAPL' },
+        { symbol: 'NVDA' },
+        { symbol: 'TSLA' },
+      ]);
+
+      const firstCall = mockCreate.mock.calls[0][0];
+      const userMessage = firstCall.messages[0].content as string;
+      expect(userMessage).toContain('AAPL');
+      expect(userMessage).toContain('NVDA');
+      expect(userMessage).toContain('TSLA');
     });
   });
 });

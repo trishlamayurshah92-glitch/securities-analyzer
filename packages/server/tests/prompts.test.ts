@@ -11,7 +11,7 @@ describe('SYSTEM_PROMPT', () => {
     expect(SYSTEM_PROMPT).toContain('Check Historical Context');
     expect(SYSTEM_PROMPT).toContain('Fetch Fresh Data');
     expect(SYSTEM_PROMPT).toContain('Analyze and Synthesize');
-    expect(SYSTEM_PROMPT).toContain('Store Results');
+    expect(SYSTEM_PROMPT).toContain('Optionally Fetch Market Context');
   });
 
   it('references all MCP tools', () => {
@@ -21,7 +21,6 @@ describe('SYSTEM_PROMPT', () => {
     expect(SYSTEM_PROMPT).toContain('get_stock_fundamentals');
     expect(SYSTEM_PROMPT).toContain('get_price_history');
     expect(SYSTEM_PROMPT).toContain('get_analyst_recommendations');
-    expect(SYSTEM_PROMPT).toContain('store_analysis');
     expect(SYSTEM_PROMPT).toContain('get_market_news');
   });
 

@@ -20,7 +20,16 @@ const mockGetAllTools = vi.fn().mockReturnValue([]);
 const mockGetMCPManager = vi.fn();
 
 vi.mock('../src/agent/mcp-singleton.js', () => ({
+  createUserMCPManager: () => mockGetMCPManager(),
   getMCPManager: () => mockGetMCPManager(),
+}));
+
+vi.mock('../src/lib/db.js', () => ({
+  prisma: {
+    watchlistItem: {
+      findMany: vi.fn().mockResolvedValue([]),
+    },
+  },
 }));
 
 // Anthropic SDK: expose the stream function so tests can control it per-call
@@ -83,7 +92,7 @@ function makeAnthropicStream(textChunks: string[], finalMsg: object) {
 
 /** Default MCP manager stub used by most tests. */
 function defaultMCPManager(tools: object[] = []) {
-  return { getAllToolsForClaude: () => tools, callTool: mockCallTool };
+  return { getAllToolsForClaude: () => tools, callTool: mockCallTool, cleanup: vi.fn().mockResolvedValue(undefined) };
 }
 
 // ---------------------------------------------------------------------------
