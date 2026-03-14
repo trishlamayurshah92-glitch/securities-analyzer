@@ -1,10 +1,24 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
+import {
+  createColumnHelper,
+  useReactTable,
+  getCoreRowModel,
+  getSortedRowModel,
+  flexRender,
+  type SortingState,
+  type RowData,
+  type SortingFn,
+} from '@tanstack/react-table'
 import SentimentBadge from './SentimentBadge'
 import type { DashboardRow } from '../hooks/useDashboard'
 
-type SortKey = 'symbol' | 'price' | 'pe_ratio' | 'market_cap' | 'beta' | 'sentiment' | 'date'
-type SortDir = 'asc' | 'desc'
+declare module '@tanstack/react-table' {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  interface ColumnMeta<TData extends RowData, TValue> {
+    tdClass?: string
+  }
+}
 
 function formatMarketCap(v: number | null | undefined): string {
   if (v == null) return '—'
@@ -25,57 +39,146 @@ interface StockTableProps {
   analyzing: string | null
 }
 
+const columnHelper = createColumnHelper<DashboardRow>()
+
+// Custom sort: nulls/undefined always go to the bottom regardless of direction
+const nullsLastSort: SortingFn<DashboardRow> = (rowA, rowB, columnId) => {
+  const a = rowA.getValue(columnId)
+  const b = rowB.getValue(columnId)
+  if (a == null && b == null) return 0
+  if (a == null) return 1
+  if (b == null) return -1
+  return a < b ? -1 : a > b ? 1 : 0
+}
+
+const thClass = 'px-3 py-2 text-left text-xs font-medium text-[#5E6C84] uppercase tracking-wider cursor-pointer select-none hover:text-[#172B4D]'
+const tdClass = 'px-3 py-3 text-sm'
+
+const columnExtraClasses: Record<string, string> = {
+  symbol: `${tdClass} font-bold text-[#0052CC]`,
+  company_name: `${tdClass} text-[#344563] max-w-[160px] truncate`,
+  price: `${tdClass} text-[#172B4D]`,
+  date: `${tdClass} text-[#8993A4] text-xs`,
+  actions: `${tdClass} flex items-center gap-2`,
+}
+
 export default function StockTable({ rows, onAnalyze, onRemove, analyzing }: StockTableProps) {
-  const [sortKey, setSortKey] = useState<SortKey | null>(null)
-  const [sortDir, setSortDir] = useState<SortDir>('asc')
-  function handleSort(key: SortKey) {
-    if (sortKey === key) {
-      if (sortDir === 'asc') {
-        setSortDir('desc')
-      } else if (sortDir === 'desc') {
-        setSortKey(null)
-      }
-    } else {
-      setSortKey(key)
-      setSortDir('asc')
-    }
-  }
+  const [sorting, setSorting] = useState<SortingState>([])
 
-  function sortIndicator(key: SortKey) {
-    if (sortKey !== key) return null
-    return sortDir === 'asc' ? ' ↑' : ' ↓'
-  }
+  const columns = useMemo(() => [
+    columnHelper.accessor('symbol', {
+      header: 'Symbol',
+      sortingFn: nullsLastSort,
+      cell: (info) => info.getValue(),
+    }),
+    columnHelper.accessor((row) => row.data?.company_name ?? undefined, {
+      id: 'company_name',
+      header: 'Company',
+      enableSorting: false,
+      cell: (info) => {
+        const val = info.getValue()
+        return <span title={val ?? ''}>{val ?? '—'}</span>
+      },
+    }),
+    columnHelper.accessor((row) => row.data?.price ?? undefined, {
+      id: 'price',
+      header: 'Price',
+      sortingFn: nullsLastSort,
+      cell: (info) => {
+        const v = info.getValue()
+        return v != null ? `$${v.toFixed(2)}` : '—'
+      },
+    }),
+    columnHelper.accessor((row) => row.data?.pe_ratio ?? undefined, {
+      id: 'pe_ratio',
+      header: 'P/E',
+      sortingFn: nullsLastSort,
+      cell: (info) => fmt(info.getValue(), 1),
+    }),
+    columnHelper.accessor((row) => row.data?.market_cap ?? undefined, {
+      id: 'market_cap',
+      header: 'Mkt Cap',
+      sortingFn: nullsLastSort,
+      cell: (info) => formatMarketCap(info.getValue()),
+    }),
+    columnHelper.accessor((row) => row.data?.beta ?? undefined, {
+      id: 'beta',
+      header: 'Beta',
+      sortingFn: nullsLastSort,
+      cell: (info) => fmt(info.getValue()),
+    }),
+    columnHelper.accessor((row) => row.data?.sentiment ?? undefined, {
+      id: 'sentiment',
+      header: 'Sentiment',
+      sortingFn: nullsLastSort,
+      cell: (info) => <SentimentBadge sentiment={info.getValue()} />,
+    }),
+    columnHelper.accessor((row) => row.data?.date ?? undefined, {
+      id: 'date',
+      header: 'Last Analysis',
+      sortingFn: nullsLastSort,
+      cell: (info) => {
+        const v = info.getValue()
+        return v ? new Date(v).toLocaleDateString() : '—'
+      },
+    }),
+    columnHelper.display({
+      id: 'actions',
+      header: 'Actions',
+      enableSorting: false,
+      cell: (info) => {
+        const symbol = info.row.original.symbol
+        return (
+          <>
+            <Link
+              to={`/news/${symbol}`}
+              className="rounded px-2 py-1 text-xs bg-[#F0F2F5] text-[#344563] hover:bg-[#DFE1E6] transition cursor-pointer"
+            >
+              News
+            </Link>
+            <button
+              onClick={() => onAnalyze(symbol)}
+              disabled={analyzing !== null}
+              className="rounded px-2 py-1 text-xs bg-[#0052CC] text-white hover:bg-[#0065FF] disabled:opacity-50 transition flex items-center gap-1 cursor-pointer disabled:cursor-not-allowed"
+            >
+              {analyzing === symbol ? (
+                <>
+                  <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  Running
+                </>
+              ) : 'Analyze'}
+            </button>
+            <button
+              onClick={() => onRemove(symbol)}
+              disabled={analyzing !== null}
+              title="Remove"
+              className="rounded p-1 text-black hover:bg-red-50 hover:text-red-700 disabled:opacity-50 transition cursor-pointer disabled:cursor-not-allowed"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+            </button>
+          </>
+        )
+      },
+    }),
+  ], [onAnalyze, onRemove, analyzing])
 
-  const sorted = [...rows].sort((a, b) => {
-    if (!sortKey) return 0
-    const ad = a.data
-    const bd = b.data
-    let av: any = null
-    let bv: any = null
-
-    if (sortKey === 'symbol') { av = a.symbol; bv = b.symbol }
-    else if (sortKey === 'price') { av = ad?.price ?? null; bv = bd?.price ?? null }
-    else if (sortKey === 'pe_ratio') { av = ad?.pe_ratio ?? null; bv = bd?.pe_ratio ?? null }
-    else if (sortKey === 'market_cap') { av = ad?.market_cap ?? null; bv = bd?.market_cap ?? null }
-    else if (sortKey === 'beta') { av = ad?.beta ?? null; bv = bd?.beta ?? null }
-    else if (sortKey === 'sentiment') { av = ad?.sentiment ?? null; bv = bd?.sentiment ?? null }
-    else if (sortKey === 'date') { av = ad?.date ?? null; bv = bd?.date ?? null }
-
-    // Nulls always sort to bottom
-    if (av == null && bv == null) return 0
-    if (av == null) return 1
-    if (bv == null) return -1
-
-    const cmp = av < bv ? -1 : av > bv ? 1 : 0
-    return sortDir === 'asc' ? cmp : -cmp
+  const table = useReactTable({
+    data: rows,
+    columns,
+    state: { sorting },
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    enableSortingRemoval: true,
+    enableMultiSort: false,
+    sortDescFirst: false,
   })
-
-  const thClass = 'px-3 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider cursor-pointer select-none hover:text-gray-200'
-  const tdClass = 'px-3 py-3 text-sm'
 
   if (rows.length === 0) {
     return (
-      <div className="text-center py-12 text-gray-500">
+      <div className="text-center py-12 text-[#8993A4]">
         No stocks yet. Add a ticker using the button above.
       </div>
     )
@@ -83,78 +186,52 @@ export default function StockTable({ rows, onAnalyze, onRemove, analyzing }: Sto
 
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-[800px] w-full border-collapse">
+      <table className="w-full border-collapse">
         <thead>
-          <tr className="border-b border-gray-800">
-            <th className={thClass} onClick={() => handleSort('symbol')}>Symbol{sortIndicator('symbol')}</th>
-            <th className={`${thClass} cursor-default hover:text-gray-400`}>Company</th>
-            <th className={thClass} onClick={() => handleSort('price')}>Price{sortIndicator('price')}</th>
-            <th className={thClass} onClick={() => handleSort('pe_ratio')}>P/E{sortIndicator('pe_ratio')}</th>
-            <th className={thClass} onClick={() => handleSort('market_cap')}>Mkt Cap{sortIndicator('market_cap')}</th>
-            <th className={thClass} onClick={() => handleSort('beta')}>Beta{sortIndicator('beta')}</th>
-            <th className={thClass} onClick={() => handleSort('sentiment')}>Sentiment{sortIndicator('sentiment')}</th>
-            <th className={thClass} onClick={() => handleSort('date')}>Last Analysis{sortIndicator('date')}</th>
-            <th className={`${thClass} cursor-default hover:text-gray-400`}>Actions</th>
+          <tr className="border-b border-[#DFE1E6]">
+            {table.getFlatHeaders().map((header) => {
+              const canSort = header.column.getCanSort()
+              const sorted = header.column.getIsSorted()
+              const sortIndicator = sorted === 'asc' ? ' ↑' : sorted === 'desc' ? ' ↓' : ''
+              return (
+                <th
+                  key={header.id}
+                  className={canSort ? thClass : `${thClass} cursor-default hover:text-[#5E6C84]`}
+                  onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
+                >
+                  {flexRender(header.column.columnDef.header, header.getContext())}
+                  {sortIndicator}
+                </th>
+              )
+            })}
           </tr>
         </thead>
         <tbody>
-          {sorted.map((row) => (
-            row.loading ? (
-              <tr key={row.symbol} className="border-b border-gray-800/50">
-                {Array.from({ length: 9 }).map((_, i) => (
-                  <td key={i} className={tdClass}>
-                    <div className="h-4 rounded bg-gray-800 animate-pulse" style={{ width: i === 0 ? '4rem' : '6rem' }} />
+          {table.getRowModel().rows.map((row) => {
+            if (row.original.loading) {
+              return (
+                <tr key={row.id} className="border-b border-[#DFE1E6]">
+                  {row.getVisibleCells().map((cell, i) => (
+                    <td key={cell.id} className={tdClass}>
+                      <div
+                        className="h-4 rounded bg-[#DFE1E6] animate-pulse"
+                        style={{ width: i === 0 ? '4rem' : '6rem' }}
+                      />
+                    </td>
+                  ))}
+                </tr>
+              )
+            }
+            return (
+              <tr key={row.id} className="border-b border-[#DFE1E6] hover:bg-[#F8F9FA]">
+                {row.getVisibleCells().map((cell) => (
+                  <td key={cell.id} className={columnExtraClasses[cell.column.id] ?? tdClass}>
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </td>
                 ))}
               </tr>
-            ) : (
-              <tr key={row.symbol} className="border-b border-gray-800/50 hover:bg-gray-900/50">
-                <td className={`${tdClass} font-bold text-emerald-400`}>{row.symbol}</td>
-                <td className={`${tdClass} text-gray-300 max-w-[160px] truncate`} title={row.data?.company_name ?? ''}>
-                  {row.data?.company_name ?? '—'}
-                </td>
-                <td className={`${tdClass} text-gray-200`}>
-                  {row.data?.price != null ? `$${row.data.price.toFixed(2)}` : '—'}
-                </td>
-                <td className={tdClass}>{fmt(row.data?.pe_ratio, 1)}</td>
-                <td className={tdClass}>{formatMarketCap(row.data?.market_cap)}</td>
-                <td className={tdClass}>{fmt(row.data?.beta)}</td>
-                <td className={tdClass}>
-                  <SentimentBadge sentiment={row.data?.sentiment} />
-                </td>
-                <td className={`${tdClass} text-gray-400 text-xs`}>
-                  {row.data?.date ? new Date(row.data.date).toLocaleDateString() : '—'}
-                </td>
-                <td className={`${tdClass} flex items-center gap-2`}>
-                  <Link
-                    to={`/news/${row.symbol}`}
-                    className="rounded px-2 py-1 text-xs bg-gray-800 text-gray-300 hover:bg-gray-700 transition"
-                  >
-                    News
-                  </Link>
-                  <button
-                    onClick={() => onAnalyze(row.symbol)}
-                    disabled={analyzing !== null}
-                    className="rounded px-2 py-1 text-xs bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-50 transition flex items-center gap-1"
-                  >
-                    {analyzing === row.symbol ? (
-                      <>
-                        <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                        Running
-                      </>
-                    ) : 'Analyze'}
-                  </button>
-                  <button
-                    onClick={() => onRemove(row.symbol)}
-                    disabled={analyzing !== null}
-                    className="rounded px-2 py-1 text-xs text-red-400 hover:bg-red-950 hover:text-red-300 disabled:opacity-50 transition"
-                  >
-                    Remove
-                  </button>
-                </td>
-              </tr>
             )
-          ))}
+          })}
         </tbody>
       </table>
     </div>

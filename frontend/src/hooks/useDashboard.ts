@@ -68,11 +68,29 @@ export function useDashboard() {
     setWatchlistError(null)
     try {
       await api.addSymbol(symbol)
-      await loadAll()
+      // Append the new row without touching existing rows
+      setRows((prev) => {
+        if (prev.some((r) => r.symbol === symbol)) return prev
+        return [...prev, { symbol, data: null, loading: true }]
+      })
+      // Auto-analyze so the row populates immediately
+      setAnalyzing(symbol)
+      setAnalyzeError(null)
+      try {
+        await api.runAnalysis([symbol])
+        await fetchRowData(symbol)
+      } catch (err: unknown) {
+        setAnalyzeError(err instanceof Error ? err.message : String(err))
+        setRows((prev) =>
+          prev.map((r) => (r.symbol === symbol ? { ...r, loading: false } : r)),
+        )
+      } finally {
+        setAnalyzing(null)
+      }
     } catch (e) {
       setWatchlistError(e instanceof Error ? e.message : 'Failed to add symbol')
     }
-  }, [loadAll])
+  }, [fetchRowData])
 
   const removeSymbol = useCallback(async (symbol: string) => {
     setWatchlistError(null)

@@ -30,7 +30,7 @@ interface Props {
 
 export default function SentimentTrend({ data }: Props) {
   if (data.length === 0) {
-    return <p className="text-sm text-gray-500">No trend data available.</p>
+    return <p className="text-sm text-[#8993A4]">No trend data available.</p>
   }
 
   const chartData = data.map((d) => ({
@@ -43,42 +43,42 @@ export default function SentimentTrend({ data }: Props) {
     <div className="h-72">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={chartData}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-          <XAxis dataKey="date" tick={{ fill: '#9ca3af', fontSize: 12 }} />
+          <CartesianGrid strokeDasharray="3 3" stroke="#DFE1E6" />
+          <XAxis dataKey="date" tick={{ fill: '#5E6C84', fontSize: 12 }} />
           <YAxis
             yAxisId="sentiment"
             domain={[0, 3]}
             ticks={[0, 1, 2, 3]}
             tickFormatter={(v: number) => SENTIMENT_LABELS[v] || ''}
-            tick={{ fill: '#9ca3af', fontSize: 12 }}
+            tick={{ fill: '#5E6C84', fontSize: 12 }}
           />
           <YAxis
             yAxisId="price"
             orientation="right"
-            tick={{ fill: '#9ca3af', fontSize: 12 }}
+            tick={{ fill: '#5E6C84', fontSize: 12 }}
             tickFormatter={(v: number) => `$${v}`}
           />
           <Tooltip
-            contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }}
-            labelStyle={{ color: '#e5e7eb' }}
+            contentStyle={{ backgroundColor: '#FFFFFF', border: '1px solid #DFE1E6' }}
+            labelStyle={{ color: '#172B4D' }}
           />
           <Legend />
           <Line
             yAxisId="sentiment"
             type="monotone"
             dataKey="sentiment"
-            stroke="#34d399"
+            stroke="#0052CC"
             strokeWidth={2}
-            dot={{ fill: '#34d399' }}
+            dot={{ fill: '#0052CC' }}
             name="Sentiment"
           />
           <Line
             yAxisId="price"
             type="monotone"
             dataKey="price"
-            stroke="#60a5fa"
+            stroke="#403294"
             strokeWidth={2}
-            dot={{ fill: '#60a5fa' }}
+            dot={{ fill: '#403294' }}
             name="Price"
           />
         </LineChart>

@@ -17,6 +17,7 @@ import { analyzeRouter } from './routes/analyze.js';
 import { historyRouter } from './routes/history.js';
 import { newsRouter } from './routes/news.js';
 import { chatRouter } from './routes/chat.js';
+import { searchRouter } from './routes/search.js';
 import { getMCPManager } from '../agent/mcp-singleton.js';
 import { logger } from '../lib/logger.js';
 import { requireAuth } from './middleware/auth.js';
@@ -46,6 +47,7 @@ app.use('/api/analyze', analyzeRouter);
 app.use('/api/history', historyRouter);
 app.use('/api/news', newsRouter);
 app.use('/api/chat', chatRouter);
+app.use('/api/search', searchRouter);
 
 app.use((req, res, next) => {
   res.on('finish', () => {

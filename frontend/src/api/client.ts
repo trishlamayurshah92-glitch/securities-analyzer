@@ -86,4 +86,7 @@ export const api = {
     if (daysBack) params.set('days_back', String(daysBack))
     return request<NewsArticle[]>(`/api/news/${symbol}?${params}`)
   },
+
+  searchSymbols: (q: string) =>
+    request<{ symbol: string; description: string }[]>(`/api/search?q=${encodeURIComponent(q)}`),
 }
