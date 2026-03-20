@@ -6,6 +6,7 @@ export function useChat() {
   const [streaming, setStreaming] = useState(false);
   const [activeTools, setActiveTools] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [ragContextCount, setRagContextCount] = useState<number | null>(null);
 
   async function sendMessage(text: string) {
     if (streaming) return;
@@ -16,6 +17,7 @@ export function useChat() {
     setMessages(historySnapshot);
     setStreaming(true);
     setError(null);
+    setRagContextCount(null);
 
     let assistantContent = '';
     setMessages((prev) => [...prev, { role: 'assistant', content: '' }]);
@@ -30,6 +32,7 @@ export function useChat() {
       },
       onToolStart: (name) => setActiveTools((prev) => [...prev, name]),
       onToolDone: (name) => setActiveTools((prev) => prev.filter((t) => t !== name)),
+      onContextRetrieved: (count) => setRagContextCount(count),
       onDone: () => {
         setStreaming(false);
         setActiveTools([]);
@@ -49,7 +52,8 @@ export function useChat() {
   function clearMessages() {
     setMessages([]);
     setError(null);
+    setRagContextCount(null);
   }
 
-  return { messages, streaming, activeTools, error, sendMessage, clearMessages };
+  return { messages, streaming, activeTools, error, ragContextCount, sendMessage, clearMessages };
 }

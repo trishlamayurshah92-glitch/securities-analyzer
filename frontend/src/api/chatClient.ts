@@ -9,6 +9,7 @@ export type ChatSSEEvent =
   | { type: 'token'; content: string }
   | { type: 'tool_start'; name: string }
   | { type: 'tool_done'; name: string }
+  | { type: 'context_retrieved'; count: number }
   | { type: 'done' }
   | { type: 'error'; message: string };
 
@@ -19,6 +20,7 @@ export async function streamChat(
     onToken: (text: string) => void;
     onToolStart: (name: string) => void;
     onToolDone: (name: string) => void;
+    onContextRetrieved?: (count: number) => void;
     onDone: () => void;
     onError: (msg: string) => void;
   },
@@ -57,6 +59,7 @@ export async function streamChat(
         if (event.type === 'token') callbacks.onToken(event.content);
         else if (event.type === 'tool_start') callbacks.onToolStart(event.name);
         else if (event.type === 'tool_done') callbacks.onToolDone(event.name);
+        else if (event.type === 'context_retrieved') callbacks.onContextRetrieved?.(event.count);
         else if (event.type === 'done') callbacks.onDone();
         else if (event.type === 'error') callbacks.onError(event.message);
       } catch {

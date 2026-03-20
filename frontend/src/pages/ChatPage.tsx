@@ -11,7 +11,7 @@ const STARTER_PROMPTS = [
 ];
 
 export default function ChatPage() {
-  const { messages, streaming, activeTools, error, sendMessage } = useChat();
+  const { messages, streaming, activeTools, error, ragContextCount, sendMessage } = useChat();
   const [input, setInput] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -69,6 +69,15 @@ export default function ChatPage() {
               <ChatMessage key={i} message={msg} />
             ))}
             {activeTools.length > 0 && <ToolCallIndicator tools={activeTools} />}
+            {streaming && ragContextCount !== null && (
+              <div className="flex justify-start px-4">
+                <span className="text-xs text-gray-400 italic">
+                  {ragContextCount > 0
+                    ? `Grounding response with ${ragContextCount} past analysis passage${ragContextCount > 1 ? 's' : ''}`
+                    : 'No prior analyses found — using live data only'}
+                </span>
+              </div>
+            )}
             <div ref={bottomRef} />
           </div>
         )}

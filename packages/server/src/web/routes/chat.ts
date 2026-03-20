@@ -3,7 +3,9 @@ import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import { createUserMCPManager } from '../../agent/mcp-singleton.js';
 import { buildChatSystemPrompt } from '../../agent/chat-prompts.js';
+import type { RagContextBlock } from '../../agent/chat-prompts.js';
 import { prisma } from '../../lib/db.js';
+import { searchHistoryBroadQuery } from '../../lib/vector-store.js';
 import type { MCPClientManager } from '../../agent/mcp-client.js';
 
 export const chatRouter = Router();
@@ -16,6 +18,7 @@ type SSEEvent =
   | { type: 'token'; content: string }
   | { type: 'tool_start'; name: string }
   | { type: 'tool_done'; name: string }
+  | { type: 'context_retrieved'; count: number }
   | { type: 'done' }
   | { type: 'error'; message: string };
 
@@ -156,11 +159,29 @@ chatRouter.post('/', asyncHandler(async (req: any, res: any) => {
   let mcpManager: Awaited<ReturnType<typeof createUserMCPManager>> | undefined;
   try {
     const userId = (req as any).userId as string;
-    const items = await prisma.watchlistItem.findMany({ where: { userId }, select: { symbol: true } });
+
+    const [items, mcpManagerResult, ragMatches] = await Promise.all([
+      prisma.watchlistItem.findMany({ where: { userId }, select: { symbol: true } }),
+      createUserMCPManager(userId),
+      searchHistoryBroadQuery(userId, message, 6),
+    ]);
+    mcpManager = mcpManagerResult;
+
     const watchlist = items.map((i) => i.symbol);
-    mcpManager = await createUserMCPManager(userId);
     const rawTools = mcpManager.getAllToolsForClaude();
-    const systemPrompt = buildChatSystemPrompt(watchlist);
+
+    sendEvent(res, { type: 'context_retrieved', count: ragMatches.length });
+
+    const ragContext: RagContextBlock[] = ragMatches.map((m) => ({
+      symbol: m.symbol,
+      section: m.section,
+      date: m.date,
+      sentiment: m.sentiment,
+      price: m.price,
+      text: m.text,
+    }));
+
+    const systemPrompt = buildChatSystemPrompt(watchlist, ragContext);
 
     const model = process.env.MODEL ?? 'gemini-2.5-flash';
     const isAnthropic = model.startsWith('claude-');
