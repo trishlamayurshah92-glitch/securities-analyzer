@@ -45,12 +45,20 @@ export function chunkReport(text: string): { section: string; text: string }[] {
   return chunks;
 }
 
+interface EmbeddingMetadata {
+  sentiment: string;
+  price: number | null;
+  createdAt: Date;
+  companyName: string | null;
+}
+
 async function storeEmbeddingWithSection(
   userId: string,
   snapshotId: number,
   symbol: string,
   text: string,
   section: string | null,
+  meta?: EmbeddingMetadata,
 ): Promise<void> {
   let embedding: number[];
   try {
@@ -59,9 +67,18 @@ async function storeEmbeddingWithSection(
     console.error(`[vector-store] embed failed for section=${section} symbol=${symbol}:`, e);
     throw e;
   }
+  const metadataJson = JSON.stringify({
+    userId,
+    symbol: symbol.toUpperCase(),
+    section,
+    sentiment: meta?.sentiment ?? null,
+    price: meta?.price ?? null,
+    createdAt: meta?.createdAt?.toISOString() ?? new Date().toISOString(),
+    companyName: meta?.companyName ?? null,
+  });
   await prisma.$executeRaw`
-    INSERT INTO "AnalysisEmbedding" ("userId", "snapshotId", symbol, section, text, embedding)
-    VALUES (${userId}, ${snapshotId}, ${symbol.toUpperCase()}, ${section}, ${text}, ${JSON.stringify(embedding)}::vector)
+    INSERT INTO "AnalysisEmbedding" ("userId", "snapshotId", symbol, section, text, embedding, metadata)
+    VALUES (${userId}, ${snapshotId}, ${symbol.toUpperCase()}, ${section}, ${text}, ${JSON.stringify(embedding)}::vector, ${metadataJson}::jsonb)
   `;
 }
 
@@ -94,7 +111,7 @@ export async function storeAnalysis(
 ): Promise<{ status: string; id?: string; message?: string }> {
   const sym = symbol.toUpperCase().trim();
 
-  let snap: { id: number };
+  let snap: { id: number; createdAt: Date };
   try {
     snap = await prisma.analysisSnapshot.create({
       data: {
@@ -112,11 +129,19 @@ export async function storeAnalysis(
         dividendYield: extra?.dividend_yield ?? null,
         companyName: extra?.company_name ?? null,
       },
+      select: { id: true, createdAt: true },
     });
   } catch (e) {
     console.error('[vector-store] Failed to create AnalysisSnapshot:', e);
     return { status: 'error', message: String(e) };
   }
+
+  const embeddingMeta: EmbeddingMetadata = {
+    sentiment,
+    price: price ?? null,
+    createdAt: snap.createdAt,
+    companyName: extra?.company_name ?? null,
+  };
 
   // Embeddings are best-effort — failure here must not hide the snapshot
   try {
@@ -124,13 +149,13 @@ export async function storeAnalysis(
     if (chunks.length > 0) {
       await Promise.all(
         chunks.map(({ section, text }) =>
-          storeEmbeddingWithSection(userId, snap.id, sym, text, section)
+          storeEmbeddingWithSection(userId, snap.id, sym, text, section, embeddingMeta)
         )
       );
       console.log(`[vector-store] Stored ${chunks.length} embedding chunks for ${sym}`);
     } else {
       // Fallback for reports without new section headers (backward compat)
-      await storeEmbedding(userId, snap.id, sym, analysisText.slice(0, 1000));
+      await storeEmbeddingWithSection(userId, snap.id, sym, analysisText.slice(0, 1000), null, embeddingMeta);
       console.log(`[vector-store] Stored 1 fallback embedding for ${sym}`);
     }
   } catch (embedErr) {
@@ -143,6 +168,7 @@ export async function storeAnalysis(
 
 export interface HistoryMatch {
   score: number;
+  symbol: string;
   date: string;
   sentiment: string;
   price: number | null;
@@ -207,6 +233,7 @@ export async function searchHistory(
 
     return results.map((row) => ({
       score: 1 - Number(row.distance),
+      symbol: row.symbol,
       date: row.createdAt instanceof Date ? row.createdAt.toISOString() : String(row.createdAt),
       sentiment: row.sentiment,
       price: row.price != null ? Number(row.price) : null,
@@ -221,6 +248,70 @@ export async function searchHistory(
       dividend_yield: row.dividendYield != null ? Number(row.dividendYield) : null,
     }));
   } catch {
+    return [];
+  }
+}
+
+// ---- LangChain PGVectorStore singleton + MMR broad query ----
+
+import type { PGVectorStore } from '@langchain/community/vectorstores/pgvector';
+
+let vectorStoreInstance: PGVectorStore | null = null;
+
+async function getVectorStore(): Promise<PGVectorStore> {
+  if (vectorStoreInstance) return vectorStoreInstance;
+  const { PGVectorStore: PGVStore } = await import('@langchain/community/vectorstores/pgvector');
+  const { GoogleGenerativeAIEmbeddings } = await import('@langchain/google-genai');
+  const pgMod = await import('pg');
+  // pg is CJS — Pool lives on .default in ESM dynamic import
+  const PoolClass: typeof import('pg').Pool = (pgMod as any).default?.Pool ?? (pgMod as any).Pool;
+
+  const pool = new PoolClass({ connectionString: process.env.DATABASE_URL });
+  const embeddings = new GoogleGenerativeAIEmbeddings({
+    model: 'models/gemini-embedding-001',
+    apiKey: process.env.GEMINI_API_KEY,
+  });
+  vectorStoreInstance = new PGVStore(embeddings, {
+    pool,
+    tableName: 'AnalysisEmbedding',
+    columns: {
+      idColumnName: 'id',
+      vectorColumnName: 'embedding',
+      contentColumnName: 'text',
+      metadataColumnName: 'metadata',
+    },
+  });
+  return vectorStoreInstance;
+}
+
+export async function searchHistoryBroadQuery(
+  userId: string,
+  query: string,
+  topK: number = 6,
+): Promise<HistoryMatch[]> {
+  try {
+    const store = await getVectorStore();
+    const retriever = store.asRetriever({
+      searchType: 'mmr',
+      searchKwargs: { fetchK: 20, lambda: 0.6 },
+      k: topK,
+      filter: { userId },
+    });
+    const docs = await retriever.invoke(query);
+    return docs.map((doc) => ({
+      score: doc.metadata.score ?? 1,
+      symbol: doc.metadata.symbol ?? '',
+      date: doc.metadata.createdAt ?? '',
+      sentiment: doc.metadata.sentiment ?? 'N/A',
+      price: doc.metadata.price ?? null,
+      text: doc.pageContent,
+      section: doc.metadata.section ?? null,
+      company_name: doc.metadata.companyName ?? null,
+      pe_ratio: null, market_cap: null, beta: null,
+      week_52_high: null, week_52_low: null, dividend_yield: null,
+    }));
+  } catch (e) {
+    console.error('[vector-store] searchHistoryBroadQuery failed:', e);
     return [];
   }
 }

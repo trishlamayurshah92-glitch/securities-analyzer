@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Install all workspace dependencies
 npm install
 
-# Build everything (shared + server) — required before running dev or CLI
+# Generate Prisma client + build everything (shared + server) — required before running dev or CLI
 npm run build
 
 # Run web backend (port 8001)
@@ -59,7 +59,7 @@ CLI (cli/) or Web API (web/) → AnalysisService (services/) → StockAnalysisOr
     → Final report returned as markdown string
 ```
 
-**Important**: MCP servers are launched as compiled JS child processes (`dist/servers/*.js`). You must run `npm run build` before `npm run dev` or `npm run cli`.
+**Important**: MCP servers are launched as compiled JS child processes (`dist/servers/*.js`). You must run `npm run build` before `npm run dev` or `npm run cli`. The build script also runs `prisma generate` to update the Prisma client.
 
 ### Dual-provider LLM support
 
@@ -72,9 +72,23 @@ All three servers use `McpServer` + `StdioServerTransport` from `@modelcontextpr
 - **fundamentals**: `get_stock_fundamentals`, `get_price_history`, `get_analyst_recommendations`
 - **history**: `search_history`, `store_analysis`, `get_sentiment_trend`
 
+### Database layer
+
+Prisma + PostgreSQL with the `pgvector` extension. Two main models:
+- `AnalysisSnapshot` — stores full report text + parsed fundamentals (price, P/E, market cap, etc.) per user/symbol
+- `AnalysisEmbedding` — stores `vector(768)` embeddings (via Gemini `gemini-embedding-001`) chunked by report section
+
+After schema changes: `npx prisma migrate dev` (inside `packages/server/`). The `packages/server/src/lib/vector-store.ts` handles both raw Prisma `$queryRaw` cosine similarity search and a LangChain `PGVectorStore` MMR retriever for broader queries.
+
+`packages/server/src/lib/parse-snapshot.ts` parses fundamentals out of the markdown report text (regex-based table extraction) to populate `AnalysisSnapshot` columns.
+
+### Authentication
+
+All `/api` routes (except search) use `requireAuth` middleware (`packages/server/src/web/middleware/auth.ts`), which validates a Supabase JWT and attaches `req.userId`. The frontend must send `Authorization: Bearer <token>` headers.
+
 ### Web layer
 
-Express app (`packages/server/src/web/app.ts`) with three routers under `/api/`: `watchlist` (CRUD on `watchlist.json`), `analyze` (runs the orchestrator), `history` (queries Pinecone via shared lib). Serves the React frontend's built assets from `frontend/dist/` in production. Dev mode: Vite on port 5173 proxies `/api` to backend on port 8001.
+Express app (`packages/server/src/web/app.ts`) with routers under `/api/`: `watchlist` (CRUD on Prisma `WatchlistItem`), `analyze` (runs the orchestrator + stores results), `history` (queries Prisma/pgvector), `chat` (SSE streaming agentic chat), `news` (Finnhub news proxy), `search` (ticker search). Serves the React frontend's built assets from `frontend/dist/` in production. Dev mode: Vite on port 5173 proxies `/api` to backend on port 8001.
 
 ### Frontend
 
@@ -91,4 +105,11 @@ Uses Vitest. Run with `npm test` from root or `npx vitest run` from `packages/se
 - `packages/server/src/agent/prompts.ts` — system prompt defining the LLM's analysis workflow and report format
 - `packages/server/src/agent/orchestrator.ts` — dual-provider agentic loop
 - `packages/server/src/lib/pinecone.ts` — shared Pinecone helpers (used by MCP history server and Express routes)
-- `.env` — API keys: `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `FINNHUB_API_KEY`, `PINECONE_API_KEY`, `MODEL`, `PORT` (optional, default 8001)
+- `.env` — API keys and config:
+  - `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `FINNHUB_API_KEY`, `PINECONE_API_KEY`
+  - `DATABASE_URL` — PostgreSQL connection string (requires `pgvector` extension enabled)
+  - `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` — used by auth middleware to validate JWT tokens
+  - `MODEL` — LLM model name (default: `gemini-2.5-flash`); determines provider (see orchestrator)
+  - `PORT` — optional, default 8001
+  - `GCP_PROJECT` — optional; if set, Anthropic calls route through Vertex AI
+  - `OPENAI_BASE_URL` — optional; override for OpenAI-compatible endpoints (Groq, etc.)

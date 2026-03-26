@@ -49,6 +49,7 @@ model AnalysisEmbedding {
   section    String?          // "summary" | "bull_case" | "bear_case" | "risks" | "catalysts" | "valuation" | "conclusion" | null (legacy)
   text       String
   embedding  Unsupported("vector(768)")
+  metadata   Json?            // JSONB: {userId, symbol, section, sentiment, price, createdAt, companyName}
 
   @@index([userId, symbol])
   @@index([userId, symbol, section])
