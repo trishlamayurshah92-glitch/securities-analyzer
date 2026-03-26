@@ -32,6 +32,8 @@
 | Web Server | Express.js | Lightweight, minimal boilerplate |
 | Frontend | React 19 + Vite + Tailwind CSS | Fast builds, component-first UI |
 | Charts | Recharts | React-native charting |
+| RAG Retrieval | LangChain (`langchain`, `@langchain/community`, `@langchain/core`, `@langchain/google-genai`) | MMR-based broad query retrieval over pgvector for chat context |
+| Data Grid | TanStack React Table v8 | Headless, sortable table for dashboard stock rows |
 | Streaming | Server-Sent Events (SSE) | Native browser support, unidirectional streaming |
 | Testing | Vitest | Fast, ESM-native, compatible with Vite |
 
@@ -70,9 +72,10 @@ stocks-main/
 │           │   └── analysis-service.ts ← High-level orchestration + parse + store
 │           ├── lib/
 │           │   ├── db.ts            ← Prisma singleton
-│           │   ├── vector-store.ts  ← embed, storeAnalysis, searchHistory, getSentimentTrend
+│           │   ├── vector-store.ts  ← embed, storeAnalysis, searchHistory, searchHistoryBroadQuery (LangChain MMR)
 │           │   ├── parse-snapshot.ts← Regex parser for LLM markdown reports
 │           │   ├── compute-diff.ts  ← Thesis drift detection between snapshots
+│           │   ├── write-lock.ts    ← Per-user async write lock (prevents concurrent snapshot writes)
 │           │   ├── errors.ts        ← AppError hierarchy with HTTP codes
 │           │   └── logger.ts        ← Structured JSON logger
 │           ├── web/
@@ -84,6 +87,7 @@ stocks-main/
 │           │       ├── analyze.ts
 │           │       ├── history.ts
 │           │       ├── news.ts
+│           │       ├── search.ts    ← Ticker symbol search (Finnhub, no auth required)
 │           │       └── chat.ts
 │           └── cli/
 │               └── main.ts          ← Commander CLI
@@ -97,12 +101,17 @@ stocks-main/
         │   ├── client.ts            ← REST API calls (auth-aware)
         │   └── chatClient.ts        ← SSE streaming client
         ├── pages/
+        │   ├── LoginPage.tsx
         │   ├── StockDashboardPage.tsx
+        │   ├── WatchlistPage.tsx
+        │   ├── AnalysisPage.tsx
         │   ├── HistoryPage.tsx
         │   ├── ChatPage.tsx
         │   └── NewsPage.tsx
         ├── hooks/
         │   ├── useDashboard.ts
+        │   ├── useAnalysis.ts
+        │   ├── useWatchlist.ts
         │   ├── useHistory.ts
         │   ├── useChat.ts
         │   └── useNews.ts
@@ -310,26 +319,33 @@ Return AnalysisResult { report, stocks_analyzed, model, duration_seconds }
 chat.ts router
         │
         ├─ Set headers: Content-Type: text/event-stream
-        ├─ Load user watchlist from Prisma
-        ├─ buildChatSystemPrompt(symbols)
-        └─ createUserMCPManager(userId)
-               └─ connects fresh manager with ANALYSIS_USER_ID=userId
         │
-        ▼
-runAnthropicStreamingLoop() OR runOpenAIStreamingLoop()
+        ├─ Parallel (Promise.all):
+        │   ├─ prisma.watchlistItem.findMany(userId) → watchlist symbols
+        │   ├─ createUserMCPManager(userId) → MCP connections
+        │   └─ searchHistoryBroadQuery(userId, message, 6)
+        │         └─ LangChain PGVectorStore.asRetriever({ searchType: "mmr", fetchK: 20, lambda: 0.6 })
+        │               → MMR-diversified top-6 chunks from AnalysisEmbedding
         │
-        ├─ LLM streams tokens → SSE: { type: "token", content: "..." }
+        ├─ SSE: { type: "context_retrieved", count: N }
         │
-        ├─ LLM calls tool → SSE: { type: "tool_start", name: "get_company_news" }
-        │   └─ mcpManager.callTool(name, args) → result
-        │   └─ SSE: { type: "tool_done", name: "get_company_news" }
+        ├─ buildChatSystemPrompt(symbols, ragContext)
+        │   └─ Embeds past analysis chunks (section, date, sentiment, price, text)
+        │      LLM instructed: trust this context first, call live tools only on demand
         │
-        └─ LLM finishes → SSE: { type: "done" }
+        └─ runAnthropicStreamingLoop() OR runOpenAIStreamingLoop()
+               │
+               ├─ LLM streams tokens → SSE: { type: "token", content: "..." }
+               ├─ LLM calls tool → SSE: { type: "tool_start", name: "..." }
+               │   └─ mcpManager.callTool(name, args) → result
+               │   └─ SSE: { type: "tool_done", name: "..." }
+               └─ LLM finishes → SSE: { type: "done" }
         │
         ▼
 Frontend ChatPage receives SSE events
         │
         ├─ onToken → append to assistant message (typing effect)
+        ├─ onContextRetrieved → display RAG context count
         ├─ onToolStart → show ToolCallIndicator (active tools)
         ├─ onToolDone → remove from active tools
         └─ onDone → unlock input
@@ -619,6 +635,21 @@ The regex parser in `parse-snapshot.ts` extracts: symbol, company name, sentimen
 
 **Trade-off:** Per-user managers add process startup overhead per request. This is ~1-2 seconds. Acceptable for infrequent, latency-tolerant analysis and chat requests.
 
+**Note:** For chat requests, `createUserMCPManager(userId)` runs in parallel with watchlist lookup and RAG retrieval via `Promise.all()` — the three operations are independent and can be safely parallelized.
+
+---
+
+### 8.11 RAG-First Chat with LangChain MMR Retrieval
+**Decision:** Chat requests always retrieve relevant past analyses via LangChain's PGVectorStore MMR retriever before invoking the LLM. Live MCP tools are only called if the user explicitly asks for fresh data.
+
+**Rationale:** Most conversational queries ("what's the bull case for AAPL?") are answered by existing analyses without paying for a live LLM tool call. MMR (Maximal Marginal Relevance) diversifies retrieved chunks across sections and analysis dates, avoiding redundant results (e.g., all 5 results from the same snapshot's `bull_case` section).
+
+**Implementation:** `searchHistoryBroadQuery()` in `vector-store.ts` uses `@langchain/community PGVectorStore` with `fetchK: 20, lambda: 0.6` — fetches 20 candidates by cosine similarity then re-ranks for diversity. Results become `RagContextBlock[]` embedded in the chat system prompt via `buildChatSystemPrompt()`.
+
+**Trade-off:** LangChain adds a large dependency tree. The PGVectorStore cold-start (dynamic import + pool creation) adds ~100ms on first request. The singleton pattern in `getVectorStore()` amortizes this across requests.
+
+**Assumption:** MMR at `lambda=0.6` (favoring relevance 60%, diversity 40%) produces better chat context than pure cosine similarity. Adjust lambda toward 1.0 for precision-focused queries.
+
 ---
 
 ## 9. API Reference
@@ -640,9 +671,11 @@ All `/api/*` routes require: `Authorization: Bearer <supabase-jwt>`
 | GET | `/api/history/:symbol/latest` | — | `RichHistoryMatch \| null` |
 | GET | `/api/news/:symbol` | `?days_back` | `NewsArticle[]` |
 | POST | `/api/chat` | `{ message, history? }` | SSE stream |
+| GET | `/api/search` | `?q` | `{ symbol, description }[]` (max 8; no auth required) |
 
 ### SSE Event Types (POST /api/chat)
 ```typescript
+{ type: "context_retrieved", count: number }  // emitted before LLM loop starts
 { type: "token",      content: string }
 { type: "tool_start", name: string }
 { type: "tool_done",  name: string }
@@ -659,6 +692,8 @@ All `/api/*` routes require: `Authorization: Bearer <supabase-jwt>`
 | `DATABASE_URL` | Yes | Supabase Postgres connection string |
 | `GEMINI_API_KEY` | Yes (default model) | Gemini LLM + embeddings |
 | `FINNHUB_API_KEY` | Yes | News data |
+| `SUPABASE_URL` | Yes | Supabase project URL (backend auth middleware) |
+| `SUPABASE_PUBLISHABLE_KEY` | Yes | Supabase anon/publishable key (backend JWT validation) |
 | `VITE_SUPABASE_URL` | Yes (frontend) | Supabase project URL |
 | `VITE_SUPABASE_ANON_KEY` | Yes (frontend) | Supabase public anon key |
 | `MODEL` | No | Default: `gemini-2.5-flash` |
@@ -682,6 +717,7 @@ All `/api/*` routes require: `Authorization: Bearer <supabase-jwt>`
 | No shared analysis cache across users | Each user runs their own LLM calls for same symbol | By design; multi-tenant isolation |
 | IVFFlat index requires minimum data before creation | Index must be created manually after initial data load | One-time setup SQL documented |
 | MCP servers must be compiled before running | Cold `npm run dev` without `npm run build` first will fail | Documented in CLAUDE.md |
+| LangChain PGVectorStore uses a separate `pg.Pool` from Prisma | Two DB connection pools exist in production | By design; Prisma raw queries and LangChain have different connection interfaces |
 
 ---
 
