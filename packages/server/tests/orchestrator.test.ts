@@ -75,7 +75,7 @@ describe('StockAnalysisOrchestrator', () => {
       // Skip setup (we don't want to spawn real MCP servers)
       const result = await orchestrator.analyzeWatchlist([{ symbol: 'AAPL' }]);
 
-      expect(result).toBe('# AAPL Analysis\n\nLooks great!');
+      expect(result.report).toBe('# AAPL Analysis\n\nLooks great!');
       expect(mockCreate).toHaveBeenCalledTimes(2);
       expect(mockCallTool).toHaveBeenCalledWith('get_company_news', { symbol: 'AAPL' });
     });
@@ -102,7 +102,7 @@ describe('StockAnalysisOrchestrator', () => {
       });
 
       const result = await orchestrator.analyzeWatchlist([{ symbol: 'BAD' }]);
-      expect(result).toBe('Error handled.');
+      expect(result.report).toBe('Error handled.');
 
       // Verify error was sent back as tool_result
       const secondCall = mockCreate.mock.calls[1][0];
@@ -152,7 +152,7 @@ describe('StockAnalysisOrchestrator', () => {
 
       const result = await orchestrator.analyzeWatchlist([{ symbol: 'NVDA' }]);
 
-      expect(result).toBe('# NVDA Analysis\n\nAll good!');
+      expect(result.report).toBe('# NVDA Analysis\n\nAll good!');
       expect(mockCreate).toHaveBeenCalledTimes(2);
       expect(mockCallTool).toHaveBeenCalledWith('get_company_news', { symbol: 'NVDA' });
     });
@@ -174,7 +174,7 @@ describe('StockAnalysisOrchestrator', () => {
       });
 
       const result = await orchestrator.analyzeWatchlist([{ symbol: 'AAPL' }]);
-      expect(result).toBe('');
+      expect(result.report).toBe('');
     });
   });
 
@@ -187,7 +187,7 @@ describe('StockAnalysisOrchestrator', () => {
   });
 
   describe('ToolLoopError', () => {
-    it('throws ToolLoopError after 20 iterations of tool_use', async () => {
+    it('throws ToolLoopError after 30 iterations of tool_use', async () => {
       // Always return tool_use to force infinite loop
       const mockCreate = vi.fn().mockResolvedValue({
         stop_reason: 'tool_use',

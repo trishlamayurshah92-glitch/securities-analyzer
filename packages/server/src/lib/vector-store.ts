@@ -1,6 +1,7 @@
+import { Prisma } from '@prisma/client';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { prisma } from './db.js';
-import type { TrendPoint } from '@stockwatch/shared';
+import type { TrendPoint, StructuredStockAnalysisV1 } from '@stockwatch/shared';
 
 const googleApiKey = process.env.GEMINI_API_KEY ?? '';
 
@@ -99,6 +100,9 @@ export interface StoreAnalysisOptions {
   week_52_high?: number | null;
   week_52_low?: number | null;
   dividend_yield?: number | null;
+  eps?: number | null;
+  structured_data?: StructuredStockAnalysisV1 | null;
+  rendered_markdown?: string | null;
 }
 
 export async function storeAnalysis(
@@ -128,6 +132,10 @@ export async function storeAnalysis(
         week52Low: extra?.week_52_low ?? null,
         dividendYield: extra?.dividend_yield ?? null,
         companyName: extra?.company_name ?? null,
+        structuredData: extra?.structured_data !== undefined && extra.structured_data !== null
+          ? (extra.structured_data as Prisma.InputJsonValue)
+          : Prisma.JsonNull,
+        renderedMarkdown: extra?.rendered_markdown ?? null,
       },
       select: { id: true, createdAt: true },
     });

@@ -68,25 +68,54 @@ export function useDashboard() {
     setWatchlistError(null)
     try {
       await api.addSymbol(symbol)
-      // Append the new row without touching existing rows
       setRows((prev) => {
         if (prev.some((r) => r.symbol === symbol)) return prev
         return [...prev, { symbol, data: null, loading: true }]
       })
-      // Auto-analyze so the row populates immediately
-      setAnalyzing(symbol)
-      setAnalyzeError(null)
+
+      // Step 1: Show quick facts immediately (~1–2s, no LLM)
       try {
-        await api.runAnalysis([symbol])
-        await fetchRowData(symbol)
-      } catch (err: unknown) {
-        setAnalyzeError(err instanceof Error ? err.message : String(err))
+        const qf = await api.getQuickFacts(symbol)
+        setRows((prev) =>
+          prev.map((r) =>
+            r.symbol === symbol
+              ? {
+                  ...r,
+                  loading: false,
+                  data: {
+                    score: 0,
+                    date: new Date().toISOString(),
+                    sentiment: 'N/A',
+                    price: qf.price,
+                    text: '',
+                    company_name: qf.company_name,
+                    pe_ratio: qf.pe_ratio,
+                    market_cap: qf.market_cap,
+                    beta: qf.beta,
+                    week_52_high: qf.week_52_high,
+                    week_52_low: qf.week_52_low,
+                    dividend_yield: qf.dividend_yield,
+                  } as RichHistoryMatch,
+                }
+              : r,
+          ),
+        )
+      } catch {
         setRows((prev) =>
           prev.map((r) => (r.symbol === symbol ? { ...r, loading: false } : r)),
         )
-      } finally {
-        setAnalyzing(null)
       }
+
+      // Step 2: Full LLM analysis in background (non-blocking)
+      setAnalyzing(symbol)
+      setAnalyzeError(null)
+      api.runAnalysis([symbol])
+        .then(() => fetchRowData(symbol))
+        .catch((err: unknown) =>
+          setAnalyzeError(err instanceof Error ? err.message : String(err)),
+        )
+        .finally(() => setAnalyzing(null))
+
     } catch (e) {
       setWatchlistError(e instanceof Error ? e.message : 'Failed to add symbol')
     }

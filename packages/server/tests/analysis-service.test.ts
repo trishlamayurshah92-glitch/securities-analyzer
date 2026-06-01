@@ -31,7 +31,7 @@ beforeEach(() => {
     { symbol: 'NVDA' },
     { symbol: 'GOOGL' },
   ]));
-  mockAnalyzeWatchlist.mockResolvedValue('# Report\n\nAnalysis complete.');
+  mockAnalyzeWatchlist.mockResolvedValue({ report: '# Report\n\nAnalysis complete.', structuredPayloads: new Map() });
 });
 
 describe('AnalysisService', () => {

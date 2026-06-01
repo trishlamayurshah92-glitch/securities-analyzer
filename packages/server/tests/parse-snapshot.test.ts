@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseSnapshotsFromReport } from '../src/lib/parse-snapshot.js';
+import { parseSnapshotsFromReport, buildEnrichedSnapshots } from '../src/lib/parse-snapshot.js';
 
 const makeReport = (symbol: string, overrides?: Record<string, string>) => {
   const sentiment = overrides?.sentiment ?? 'Bullish';
@@ -128,5 +128,77 @@ describe('parseSnapshotsFromReport', () => {
     const report = makeReport('aapl');
     const [snap] = parseSnapshotsFromReport(report, ['aapl']);
     expect(snap.symbol).toBe('AAPL');
+  });
+});
+
+const validStructuredPayload = {
+  schemaVersion: 1 as const,
+  symbol: 'AAPL',
+  companyName: 'Apple Inc.',
+  sentiment: 'Bullish' as const,
+  price: 182.5,
+  peRatio: 28.1,
+  marketCap: 2.8e12,
+  beta: 1.29,
+  week52High: 199.62,
+  week52Low: 124.17,
+  dividendYield: 0.0055,
+  eps: 6.42,
+  analystConsensus: 'Buy',
+  analystPriceTarget: 210.0,
+  bullCase: ['Strong ecosystem', 'Services growth'],
+  bearCase: ['High valuation', 'China risk'],
+  risks: ['Macro slowdown', 'Regulatory pressure'],
+  catalysts: ['iPhone cycle', 'AI features'],
+  valuation: 'Fair value at current levels',
+  conclusion: 'Hold with conviction',
+  completenessScore: 0.9,
+  dataConfidence: 'high' as const,
+  missingFields: [],
+};
+
+describe('buildEnrichedSnapshots', () => {
+  it('valid payload path — uses structured data, beta non-null', () => {
+    const report = makeReport('AAPL');
+    const payloads = new Map<string, unknown>([['AAPL', validStructuredPayload]]);
+    const [snap] = buildEnrichedSnapshots(payloads, report, ['AAPL']);
+    expect(snap.symbol).toBe('AAPL');
+    expect(snap.structuredData).not.toBeNull();
+    expect(snap.beta).toBe(1.29);
+    expect(snap.eps).toBe(6.42);
+    expect(snap.price).toBe(182.5);
+    expect(snap.sentiment).toBe('Bullish');
+  });
+
+  it('missing payload falls back to regex', () => {
+    const report = makeReport('AAPL');
+    const payloads = new Map<string, unknown>(); // empty — no entry for AAPL
+    const [snap] = buildEnrichedSnapshots(payloads, report, ['AAPL']);
+    expect(snap.symbol).toBe('AAPL');
+    expect(snap.structuredData).toBeNull();
+    expect(snap.beta).toBeNull(); // regex fallback has null beta
+    expect(snap.price).toBe(182.5); // parsed from markdown table
+    expect(snap.eps).toBeNull();
+  });
+
+  it('invalid payload falls back to regex', () => {
+    const report = makeReport('AAPL');
+    // Invalid payload (missing required fields)
+    const payloads = new Map<string, unknown>([['AAPL', { schemaVersion: 1, symbol: 'AAPL' }]]);
+    const [snap] = buildEnrichedSnapshots(payloads, report, ['AAPL']);
+    expect(snap.symbol).toBe('AAPL');
+    expect(snap.structuredData).toBeNull();
+    expect(snap.price).toBe(182.5); // parsed from markdown
+  });
+
+  it('multiple symbols — each independently resolved', () => {
+    const aaplPayload = { ...validStructuredPayload, symbol: 'AAPL' };
+    const report = makeReport('AAPL') + '\n' + makeReport('NVDA', { company: 'Nvidia Corp', price: '$450.00' });
+    const payloads = new Map<string, unknown>([['AAPL', aaplPayload]]);
+    const snaps = buildEnrichedSnapshots(payloads, report, ['AAPL', 'NVDA']);
+    expect(snaps).toHaveLength(2);
+    expect(snaps[0].structuredData).not.toBeNull(); // AAPL has valid payload
+    expect(snaps[1].structuredData).toBeNull();     // NVDA falls back to regex
+    expect(snaps[1].price).toBe(450.0);
   });
 });

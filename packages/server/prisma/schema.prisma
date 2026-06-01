@@ -33,9 +33,11 @@ model AnalysisSnapshot {
   beta          Float?
   week52High    Float?
   week52Low     Float?
-  dividendYield Float?
-  companyName   String?
-  embeddings    AnalysisEmbedding[]
+  dividendYield    Float?
+  companyName      String?
+  structuredData   Json?
+  renderedMarkdown String?
+  embeddings       AnalysisEmbedding[]
 
   @@index([userId, symbol, createdAt(sort: Desc)])
 }

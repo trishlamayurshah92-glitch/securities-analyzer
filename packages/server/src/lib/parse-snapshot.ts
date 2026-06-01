@@ -1,4 +1,6 @@
-import type { Sentiment } from '@stockwatch/shared';
+import type { Sentiment, StructuredStockAnalysisV1 } from '@stockwatch/shared';
+import { StructuredStockAnalysisV1Schema } from '@stockwatch/shared';
+import { logger } from './logger.js';
 
 export interface ParsedSnapshot {
   symbol: string;
@@ -107,6 +109,112 @@ export function parseSnapshotsFromReport(report: string, symbols: string[]): Par
       week52Low,
       dividendYield,
     });
+  }
+
+  return results;
+}
+
+export interface EnrichedSnapshot {
+  symbol: string;
+  structuredData: StructuredStockAnalysisV1 | null;
+  reportText: string;
+  renderedMarkdown: string;
+  sentiment: Sentiment;
+  companyName: string | null;
+  price: number | null;
+  peRatio: number | null;
+  marketCap: number | null;
+  beta: number | null;
+  week52High: number | null;
+  week52Low: number | null;
+  dividendYield: number | null;
+  eps: number | null;
+}
+
+export function buildEnrichedSnapshots(
+  structuredPayloads: Map<string, unknown>,
+  report: string,
+  symbols: string[],
+): EnrichedSnapshot[] {
+  const results: EnrichedSnapshot[] = [];
+
+  for (const sym of symbols) {
+    // Extract the per-stock markdown section
+    const sectionRe = new RegExp(
+      `###\\s+${sym}\\b([\\s\\S]*?)(?=\\n###\\s+[A-Z]|$)`,
+      'i',
+    );
+    const sectionMatch = report.match(sectionRe);
+    const markdownSection = sectionMatch ? sectionMatch[0].trim() : '';
+
+    const rawPayload = structuredPayloads.get(sym.toUpperCase());
+    const parsed = StructuredStockAnalysisV1Schema.safeParse(rawPayload);
+
+    if (parsed.success) {
+      const d = parsed.data;
+      results.push({
+        symbol: sym.toUpperCase(),
+        structuredData: d,
+        reportText: markdownSection,
+        renderedMarkdown: markdownSection,
+        sentiment: d.sentiment,
+        companyName: d.companyName,
+        price: d.price,
+        peRatio: d.peRatio,
+        marketCap: d.marketCap,
+        beta: d.beta,
+        week52High: d.week52High,
+        week52Low: d.week52Low,
+        dividendYield: d.dividendYield,
+        eps: d.eps,
+      });
+    } else {
+      if (rawPayload !== undefined) {
+        logger.warn('enriched_snapshot_fallback', {
+          symbol: sym,
+          reason: 'invalid structured payload',
+        });
+      }
+      // Fall back to regex parsing
+      const legacy = parseSnapshotsFromReport(report, [sym]);
+      const leg = legacy[0];
+      if (leg) {
+        results.push({
+          symbol: leg.symbol,
+          structuredData: null,
+          reportText: leg.reportText,
+          renderedMarkdown: leg.reportText,
+          sentiment: leg.sentiment,
+          companyName: leg.companyName,
+          price: leg.price,
+          peRatio: leg.peRatio,
+          marketCap: leg.marketCap,
+          beta: leg.beta,
+          week52High: leg.week52High,
+          week52Low: leg.week52Low,
+          dividendYield: leg.dividendYield,
+          eps: null,
+        });
+      } else {
+        // Symbol not found in report at all — still emit a minimal entry
+        results.push({
+          symbol: sym.toUpperCase(),
+          structuredData: null,
+          reportText: markdownSection,
+          renderedMarkdown: markdownSection,
+          sentiment: 'Neutral',
+          companyName: null,
+          price: null,
+          peRatio: null,
+          marketCap: null,
+          beta: null,
+          week52High: null,
+          week52Low: null,
+          dividendYield: null,
+          eps: null,
+        });
+      }
+    }
   }
 
   return results;

@@ -4,7 +4,7 @@ import { StockAnalysisOrchestrator } from '../agent/orchestrator.js';
 import { WATCHLIST_PATH } from '../config.js';
 import { prisma } from '../lib/db.js';
 import { storeAnalysis } from '../lib/vector-store.js';
-import { parseSnapshotsFromReport } from '../lib/parse-snapshot.js';
+import { buildEnrichedSnapshots } from '../lib/parse-snapshot.js';
 
 export class AnalysisService {
   private orchestrator: StockAnalysisOrchestrator | null;
@@ -44,15 +44,15 @@ export class AnalysisService {
       await this.orchestrator.setup();
 
       const start = Date.now();
-      const report = await this.orchestrator.analyzeWatchlist(watchlist);
+      const { report, structuredPayloads } = await this.orchestrator.analyzeWatchlist(watchlist);
       const duration = (Date.now() - start) / 1000;
 
       if (options?.userId) {
         const symbols = watchlist.map((w) => w.symbol);
-        const parsed = parseSnapshotsFromReport(report, symbols);
+        const enriched = buildEnrichedSnapshots(structuredPayloads, report, symbols);
 
         await Promise.allSettled(
-          parsed.map((p) =>
+          enriched.map((p) =>
             storeAnalysis(
               options.userId!,
               p.symbol,
@@ -60,13 +60,16 @@ export class AnalysisService {
               p.sentiment,
               p.price,
               {
-                company_name:   p.companyName,
-                pe_ratio:       p.peRatio,
-                market_cap:     p.marketCap,
-                beta:           p.beta,
-                week_52_high:   p.week52High,
-                week_52_low:    p.week52Low,
-                dividend_yield: p.dividendYield,
+                company_name:      p.companyName,
+                pe_ratio:          p.peRatio,
+                market_cap:        p.marketCap,
+                beta:              p.beta,
+                week_52_high:      p.week52High,
+                week_52_low:       p.week52Low,
+                dividend_yield:    p.dividendYield,
+                eps:               p.eps,
+                structured_data:   p.structuredData,
+                rendered_markdown: p.renderedMarkdown,
               },
             ).then((r) => {
               if (r.status === 'error') {
