@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import { prisma } from '../../lib/db.js';
-import { AnalysisService } from '../../services/analysis-service.js';
 import type { AuthRequest } from '../middleware/auth.js';
 
 export const watchlistRouter = Router();
@@ -33,13 +32,6 @@ watchlistRouter.post('/', async (req, res) => {
       symbol: item.symbol,
       addedAt: item.addedAt.toISOString(),
       message: `${symbol} added to watchlist`,
-    });
-
-    setImmediate(() => {
-      const service = new AnalysisService();
-      service.runAnalysis({ symbols: [symbol], userId }).catch((err: unknown) =>
-        console.error(`Background analysis failed for ${symbol}:`, err),
-      );
     });
   } catch (e: any) {
     if (e?.code === 'P2002') {

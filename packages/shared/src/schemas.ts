@@ -3,6 +3,45 @@ import { z } from 'zod';
 export const SentimentSchema = z.enum(['Bullish', 'Bearish', 'Neutral', 'Mixed']);
 export type Sentiment = z.infer<typeof SentimentSchema>;
 
+export const STRUCTURED_ANALYSIS_VERSION = 1 as const;
+
+export const StructuredStockAnalysisV1Schema = z.object({
+  schemaVersion: z.literal(1),
+  symbol: z.string(),
+  companyName: z.string().nullable(),
+  sentiment: SentimentSchema,
+
+  // Valuation metrics (all nullable — use null if data not available)
+  price: z.number().nullable(),
+  peRatio: z.number().nullable(),
+  marketCap: z.number().nullable(),
+  beta: z.number().nullable(),
+  week52High: z.number().nullable(),
+  week52Low: z.number().nullable(),
+  dividendYield: z.number().nullable(),
+  eps: z.number().nullable(),
+
+  // Analyst
+  analystConsensus: z.string().nullable(),
+  analystPriceTarget: z.number().nullable(),
+
+  // Narrative arrays (2–4 items each)
+  bullCase: z.array(z.string()),
+  bearCase: z.array(z.string()),
+  risks: z.array(z.string()),
+  catalysts: z.array(z.string()),
+
+  // Free-text
+  valuation: z.string().nullable(),
+  conclusion: z.string().nullable(),
+
+  // Self-reported data quality
+  completenessScore: z.number().min(0).max(1),
+  dataConfidence: z.enum(['high', 'medium', 'low']),
+  missingFields: z.array(z.string()),
+});
+export type StructuredStockAnalysisV1 = z.infer<typeof StructuredStockAnalysisV1Schema>;
+
 export const NewsArticleSchema = z.object({
   headline: z.string(),
   summary: z.string(),
@@ -70,6 +109,8 @@ export const AnalysisSnapshotSchema = z.object({
   week52Low: z.number().nullable(),
   dividendYield: z.number().nullable(),
   companyName: z.string().nullable(),
+  structuredData: StructuredStockAnalysisV1Schema.nullable().optional(),
+  renderedMarkdown: z.string().nullable().optional(),
 });
 export type AnalysisSnapshot = z.infer<typeof AnalysisSnapshotSchema>;
 

@@ -72,6 +72,7 @@ historyRouter.get('/:symbol/latest', asyncHandler(async (req: any, res: any) => 
     week_52_high: snap.week52High,
     week_52_low: snap.week52Low,
     dividend_yield: snap.dividendYield,
+    structured_data: snap.structuredData ?? null,
   });
 }));
 

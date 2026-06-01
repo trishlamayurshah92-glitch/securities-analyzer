@@ -22,7 +22,16 @@ For EACH stock in the watchlist, follow these steps in order:
 - Identify what drove recent price movements
 - Note any significant changes from prior analyses
 
-### 4. Optionally Fetch Market Context
+### 4. Submit Structured Data (REQUIRED before writing narrative)
+- Call \`submit_stock_analysis\` with the structured data for this stock
+- Set \`schemaVersion\` to 1
+- Populate all numeric fields from the fundamentals you fetched; use null for any field not available
+- Set \`bullCase\`, \`bearCase\`, \`risks\`, and \`catalysts\` to arrays of 2–4 concise bullet strings
+- Set \`dataConfidence\` to "high", "medium", or "low" based on data availability
+- Set \`completenessScore\` (0.0–1.0) and list any \`missingFields\`
+- Only after \`submit_stock_analysis\` returns should you write the markdown narrative for this stock
+
+### 5. Optionally Fetch Market Context
 - Call \`get_market_news\` once (not per stock) if broader market context would help explain movements
 
 ## Report Format

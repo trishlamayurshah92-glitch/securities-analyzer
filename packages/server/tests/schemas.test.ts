@@ -10,6 +10,7 @@ import {
   TrendPointSchema,
   AddSymbolRequestSchema,
   AnalyzeRequestSchema,
+  StructuredStockAnalysisV1Schema,
 } from '@stockwatch/shared';
 
 describe('SentimentSchema', () => {
@@ -192,5 +193,98 @@ describe('AnalyzeRequestSchema', () => {
       model: 'gpt-4o-mini',
     });
     expect(req.symbols).toEqual(['AAPL', 'NVDA']);
+  });
+});
+
+const validStructuredPayload = {
+  schemaVersion: 1 as const,
+  symbol: 'AAPL',
+  companyName: 'Apple Inc.',
+  sentiment: 'Bullish' as const,
+  price: 182.5,
+  peRatio: 28.1,
+  marketCap: 2.8e12,
+  beta: 1.29,
+  week52High: 199.62,
+  week52Low: 124.17,
+  dividendYield: 0.0055,
+  eps: 6.42,
+  analystConsensus: 'Buy',
+  analystPriceTarget: 210.0,
+  bullCase: ['Strong ecosystem', 'Services growth'],
+  bearCase: ['High valuation', 'China risk'],
+  risks: ['Macro slowdown', 'Regulatory pressure'],
+  catalysts: ['iPhone cycle', 'AI features'],
+  valuation: 'Fair value at current levels',
+  conclusion: 'Hold with conviction',
+  completenessScore: 0.9,
+  dataConfidence: 'high' as const,
+  missingFields: [],
+};
+
+describe('StructuredStockAnalysisV1Schema', () => {
+  it('accepts valid full payload', () => {
+    const result = StructuredStockAnalysisV1Schema.safeParse(validStructuredPayload);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.symbol).toBe('AAPL');
+      expect(result.data.sentiment).toBe('Bullish');
+      expect(result.data.schemaVersion).toBe(1);
+    }
+  });
+
+  it('rejects wrong schemaVersion', () => {
+    const bad = { ...validStructuredPayload, schemaVersion: 2 };
+    const result = StructuredStockAnalysisV1Schema.safeParse(bad);
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects completenessScore > 1', () => {
+    const bad = { ...validStructuredPayload, completenessScore: 1.5 };
+    const result = StructuredStockAnalysisV1Schema.safeParse(bad);
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects completenessScore < 0', () => {
+    const bad = { ...validStructuredPayload, completenessScore: -0.1 };
+    const result = StructuredStockAnalysisV1Schema.safeParse(bad);
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts nullable fields as null', () => {
+    const payload = {
+      ...validStructuredPayload,
+      companyName: null,
+      price: null,
+      peRatio: null,
+      marketCap: null,
+      beta: null,
+      week52High: null,
+      week52Low: null,
+      dividendYield: null,
+      eps: null,
+      analystConsensus: null,
+      analystPriceTarget: null,
+      valuation: null,
+      conclusion: null,
+    };
+    const result = StructuredStockAnalysisV1Schema.safeParse(payload);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.price).toBeNull();
+      expect(result.data.companyName).toBeNull();
+    }
+  });
+
+  it('rejects invalid dataConfidence value', () => {
+    const bad = { ...validStructuredPayload, dataConfidence: 'very-high' };
+    const result = StructuredStockAnalysisV1Schema.safeParse(bad);
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects missing required fields', () => {
+    const { symbol: _removed, ...withoutSymbol } = validStructuredPayload;
+    const result = StructuredStockAnalysisV1Schema.safeParse(withoutSymbol);
+    expect(result.success).toBe(false);
   });
 });

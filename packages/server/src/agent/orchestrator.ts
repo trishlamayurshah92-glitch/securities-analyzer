@@ -5,10 +5,12 @@ import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import { MCPClientManager } from './mcp-client.js';
 import { SYSTEM_PROMPT } from './prompts.js';
+import { SUBMIT_STOCK_ANALYSIS_TOOL } from './tool-schemas.js';
+import { StructuredStockAnalysisV1Schema } from '@stockwatch/shared';
 import { ToolLoopError, AnalysisTimeoutError, ConfigError } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
 
-const MAX_TOOL_ITERATIONS = 20;
+const MAX_TOOL_ITERATIONS = 30;
 const TOOL_TIMEOUT_MS = 30_000;
 const OVERALL_TIMEOUT_MS = 10 * 60 * 1000;
 
@@ -79,6 +81,7 @@ export class StockAnalysisOrchestrator {
   private mcpManager: MCPClientManager;
   private externalManager: boolean;
   private userId: string;
+  private structuredPayloads = new Map<string, unknown>();
 
   constructor(options?: {
     client?: Anthropic | OpenAI;
@@ -115,17 +118,21 @@ export class StockAnalysisOrchestrator {
     }
   }
 
-  async analyzeWatchlist(watchlist: Array<{ symbol: string }>): Promise<string> {
+  async analyzeWatchlist(watchlist: Array<{ symbol: string }>): Promise<{ report: string; structuredPayloads: Map<string, unknown> }> {
+    this.structuredPayloads.clear();
     if (isOpenAIModel(this.model)) {
       return this.runOpenAILoop(watchlist);
     }
     return this.runAnthropicLoop(watchlist);
   }
 
-  private async runAnthropicLoop(watchlist: Array<{ symbol: string }>): Promise<string> {
+  private async runAnthropicLoop(watchlist: Array<{ symbol: string }>): Promise<{ report: string; structuredPayloads: Map<string, unknown> }> {
     const client = this.client as Anthropic;
-    const tools = this.mcpManager.getAllToolsForClaude()
-      .filter((t) => t.name !== 'store_analysis');
+    const tools = [
+      ...this.mcpManager.getAllToolsForClaude()
+        .filter((t) => t.name !== 'store_analysis' && t.name !== 'submit_stock_analysis'),
+      SUBMIT_STOCK_ANALYSIS_TOOL,
+    ];
 
     const symbols = watchlist.map((s) => s.symbol).join(', ');
     const watchlistJson = JSON.stringify(watchlist, null, 2);
@@ -175,6 +182,29 @@ export class StockAnalysisOrchestrator {
 
         const toolResults: Anthropic.ToolResultBlockParam[] = [];
         for (const toolBlock of toolUseBlocks) {
+          if (toolBlock.name === 'submit_stock_analysis') {
+            const parsed = StructuredStockAnalysisV1Schema.safeParse(toolBlock.input);
+            if (parsed.success) {
+              this.structuredPayloads.set(parsed.data.symbol.toUpperCase(), parsed.data);
+              logger.info('structured_analysis_captured', { symbol: parsed.data.symbol });
+            } else {
+              logger.warn('structured_analysis_invalid', {
+                symbol: (toolBlock.input as any)?.symbol,
+                issues: parsed.error.issues,
+              });
+              this.structuredPayloads.set(
+                String((toolBlock.input as any)?.symbol ?? '').toUpperCase(),
+                null,
+              );
+            }
+            toolResults.push({
+              type: 'tool_result',
+              tool_use_id: toolBlock.id,
+              content: '{"status":"ok"}',
+            });
+            continue;
+          }
+
           const t0 = Date.now();
           logger.info('tool_call', { tool: toolBlock.name, iteration: iterations });
           try {
@@ -210,17 +240,21 @@ export class StockAnalysisOrchestrator {
       clearTimeout(overallTimeoutHandle!);
     }
 
-    return response!.content
+    const report = response!.content
       .filter((b): b is Anthropic.TextBlock => b.type === 'text')
       .map((b) => b.text)
       .join('');
+
+    return { report, structuredPayloads: this.structuredPayloads };
   }
 
-  private async runOpenAILoop(watchlist: Array<{ symbol: string }>): Promise<string> {
+  private async runOpenAILoop(watchlist: Array<{ symbol: string }>): Promise<{ report: string; structuredPayloads: Map<string, unknown> }> {
     const client = this.client as OpenAI;
-    const tools = convertToolsForOpenAI(
-      this.mcpManager.getAllToolsForClaude().filter((t) => t.name !== 'store_analysis'),
-    );
+    const tools = convertToolsForOpenAI([
+      ...this.mcpManager.getAllToolsForClaude()
+        .filter((t) => t.name !== 'store_analysis' && t.name !== 'submit_stock_analysis'),
+      SUBMIT_STOCK_ANALYSIS_TOOL,
+    ]);
 
     const symbols = watchlist.map((s) => s.symbol).join(', ');
     const watchlistJson = JSON.stringify(watchlist, null, 2);
@@ -267,6 +301,36 @@ export class StockAnalysisOrchestrator {
 
           for (const toolCall of message.tool_calls) {
             const fn = toolCall.function;
+
+            if (fn.name === 'submit_stock_analysis') {
+              let parsedArgs: unknown;
+              try {
+                parsedArgs = JSON.parse(fn.arguments);
+              } catch {
+                parsedArgs = {};
+              }
+              const parsed = StructuredStockAnalysisV1Schema.safeParse(parsedArgs);
+              if (parsed.success) {
+                this.structuredPayloads.set(parsed.data.symbol.toUpperCase(), parsed.data);
+                logger.info('structured_analysis_captured', { symbol: parsed.data.symbol });
+              } else {
+                logger.warn('structured_analysis_invalid', {
+                  symbol: (parsedArgs as any)?.symbol,
+                  issues: parsed.error.issues,
+                });
+                this.structuredPayloads.set(
+                  String((parsedArgs as any)?.symbol ?? '').toUpperCase(),
+                  null,
+                );
+              }
+              messages.push({
+                role: 'tool',
+                tool_call_id: toolCall.id,
+                content: '{"status":"ok"}',
+              });
+              continue;
+            }
+
             const t0 = Date.now();
             logger.info('tool_call', { tool: fn.name, iteration: iterations });
             let result: string;
@@ -299,7 +363,7 @@ export class StockAnalysisOrchestrator {
       clearTimeout(overallTimeoutHandle!);
     }
 
-    return message!.content ?? '';
+    return { report: message!.content ?? '', structuredPayloads: this.structuredPayloads };
   }
 
   async cleanup(): Promise<void> {

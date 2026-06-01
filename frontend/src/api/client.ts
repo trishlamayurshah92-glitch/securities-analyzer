@@ -87,6 +87,21 @@ export const api = {
     return request<NewsArticle[]>(`/api/news/${symbol}?${params}`)
   },
 
+  getQuickFacts: (symbol: string) =>
+    request<{
+      symbol: string;
+      company_name: string | null;
+      price: number | null;
+      pe_ratio: number | null;
+      market_cap: number | null;
+      beta: number | null;
+      week_52_high: number | null;
+      week_52_low: number | null;
+      dividend_yield: number | null;
+      eps: number | null;
+      sector: string | null;
+    }>(`/api/quickfacts/${symbol}`),
+
   searchSymbols: (q: string) =>
     request<{ symbol: string; description: string }[]>(`/api/search?q=${encodeURIComponent(q)}`),
 }
